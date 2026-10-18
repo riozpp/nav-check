@@ -73,6 +73,7 @@
               :is="currentSettingsComponent" 
               v-bind="componentProps"
               @action="handleAction"
+              @reload="$emit('reloadData')"
               @editTitle="editTitle"
               @editFooter="editFooter"
               @uploadAvatar="$emit('uploadAvatar', $event)"
@@ -166,7 +167,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['action', 'close', 'setThemeMode', 'setThemeStyle', 'toggleSearch', 'toggleHideEmpty', 'togglePublicMode', 'updateTitle', 'updateFooter', 'editTitle', 'editFooter', 'setActiveTab', 'toggleRandomWallpaper', 'updateWallpaperApi', 'setDisplayMode', 'uploadAvatar'])
+const emit = defineEmits(['action', 'close', 'reloadData', 'setThemeMode', 'setThemeStyle', 'toggleSearch', 'toggleHideEmpty', 'togglePublicMode', 'updateTitle', 'updateFooter', 'editTitle', 'editFooter', 'setActiveTab', 'toggleRandomWallpaper', 'updateWallpaperApi', 'setDisplayMode', 'uploadAvatar'])
 
 const menuItems = ref([
   { id: 'appearance', name: '外观设置' },

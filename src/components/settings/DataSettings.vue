@@ -64,6 +64,41 @@
       </button>
     </div>
 
+    <!-- 定时全量检测 -->
+    <div class="form-group">
+      <div class="form-header">
+        <div class="form-title">定时全量检测</div>
+        <div class="form-description">
+          <span v-if="scheduledEnabled">
+            已启用：通过 GitHub Actions 每天自动检测全部书签<br>
+            <span v-if="lastRun" class="last-run">
+              上次运行：{{ formatTime(lastRun.at) }}（检测 {{ lastRun.total }} 个，失效 {{ lastRun.fail }} 个）
+            </span>
+            <span v-else class="last-run">尚未运行过</span>
+            <span v-if="stats && stats.unchecked > 0" class="last-run">
+              · 还有 {{ stats.unchecked }} 个书签未经检测
+            </span>
+          </span>
+          <span v-else>
+            未启用：需在 Cloudflare 配置 CRON_SECRET，并在 GitHub 仓库配置 Actions 密钥
+          </span>
+        </div>
+      </div>
+      <div class="action-group">
+        <button
+          v-if="scheduledEnabled"
+          class="text-btn"
+          @click="runScheduledNow"
+          :disabled="running"
+        >
+          {{ running ? '执行中…' : '立即运行' }}
+        </button>
+        <button class="text-btn" @click="$emit('action', 'linkCheck')">
+          手动检测
+        </button>
+      </div>
+    </div>
+
     <!-- 统计信息 -->
     <div class="form-group">
       <div class="form-header">
@@ -77,7 +112,11 @@
 </template>
 
 <script setup>
-defineProps({
+import { ref, onMounted } from 'vue'
+import { useAuth } from '../../composables/useAuth'
+import { useToast } from '../../composables/useToast'
+
+const props = defineProps({
   totalBookmarks: Number,
   privateBookmarks: Number,
   failCount: {
@@ -90,7 +129,65 @@ defineProps({
   }
 })
 
-defineEmits(['action'])
+const emit = defineEmits(['action', 'reload'])
+
+const { apiRequest } = useAuth()
+const { success: toastSuccess, error: toastError } = useToast()
+
+const scheduledEnabled = ref(false)
+const lastRun = ref(null)
+const stats = ref(null)
+const running = ref(false)
+
+const formatTime = (iso) => {
+  if (!iso) return ''
+  try {
+    return new Date(iso).toLocaleString('zh-CN')
+  } catch {
+    return iso
+  }
+}
+
+// 拉取定时检测状态，每次进入设置页时刷新
+const loadStatus = async () => {
+  try {
+    const response = await apiRequest('/api/bookmarks/check-status')
+    if (!response.ok) return
+    const data = await response.json()
+    scheduledEnabled.value = Boolean(data.scheduledEnabled)
+    lastRun.value = data.lastRun
+    stats.value = data.stats
+  } catch (error) {
+    console.error('加载检测状态失败:', error)
+  }
+}
+
+// 立即触发一次滚动检测（复用定时任务使用的接口，需登录态 + CRON_SECRET 由后端校验）
+const runScheduledNow = async () => {
+  running.value = true
+  try {
+    const response = await apiRequest('/api/bookmarks/check-all-now', {
+      method: 'POST',
+      body: JSON.stringify({ limit: 50 })
+    })
+    const data = await response.json()
+    if (data.success) {
+      toastSuccess(`检测完成：共 ${data.total} 个，失效 ${data.fail} 个`)
+      await loadStatus()
+      emit('reload')
+    } else {
+      toastError(data.error || '检测失败')
+    }
+  } catch (error) {
+    toastError(error.message || '检测失败')
+  } finally {
+    running.value = false
+  }
+}
+
+onMounted(loadStatus)
+
+defineExpose({ loadStatus })
 </script>
 
 <style scoped>
@@ -153,5 +250,18 @@ defineEmits(['action'])
   color: var(--text-secondary);
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.action-group {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.last-run {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
 }
 </style>

@@ -270,6 +270,7 @@
       :active-settings-tab="activeSettingsTab"
       :empty-category-count="emptyCategoryCount"
       @action="handleSettingsAction"
+      @reload-data="fetchData"
       @set-theme-mode="setThemeMode"
       @set-theme-style="setThemeStyle"
       @toggle-search="toggleSearch"
