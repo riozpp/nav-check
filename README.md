@@ -11,6 +11,8 @@
 - 💾 **云端备份**：备份到 Cloudflare R2，支持恢复（可选）
 - ⚡ **批量操作**：批量移动、编辑、删除
 - 🔗 **链接有效性检测**：批量检测书签 URL 是否可访问，卡片展示状态角标，支持一键删除失效书签
+- 🤖 **AI 死链修复**：对失效书签让 AI 推断替代链接与网页存档地址（需配置 AI）
+- ⏰ **定时全量检测**：通过 GitHub Actions 每天自动滚动检测全量书签（可选）
 - 🤖 **AI 功能**：智能生成描述、分类推荐（支持 OpenAI 兼容 API）
 - 🎨 **主题定制**：亮色/暗色主题、自定义壁纸、标题、页脚
 - 🌐 **浏览器扩展**：支持 Chrome、Edge、Brave、Firefox
@@ -57,6 +59,18 @@ Vue 3 + Vite + Cloudflare Pages Functions + D1 + R2
 - 重试部署
 
 > **提示**：所有配置通过 Dashboard 完成，无需修改代码。`wrangler.toml` 仅用于本地开发（已添加到 `.gitignore`）。
+
+## ⏰ 定时检测失效书签（可选）
+
+新增 `CRON_SECRET` 环境变量（随机长字符串），再到 GitHub 仓库配置两个 Actions 密钥：
+
+| 密钥 | 值 |
+| --- | --- |
+| `SITE_URL` | 站点地址，如 `https://your-site.pages.dev` |
+| `CRON_SECRET` | 与 Pages 环境变量 `CRON_SECRET` 保持一致 |
+
+之后 `.github/workflows/link-check.yml` 会每天定时调用 `/api/bookmarks/check-all` 做滚动全量检测（按最久未检测优先，每轮 100 个）。
+也可在 Actions 页面手动触发。
 
 **本地开发**：
 ```bash

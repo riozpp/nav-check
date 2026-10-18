@@ -12,7 +12,7 @@
         @input="handleSearch"
         @focus="showResults = true"
       >
-      <button v-if="query || selectedCategoryId || selectedTags.length > 0" class="clear-btn" @click="clearSearch" title="清除搜索">
+      <button v-if="query || selectedCategoryId || selectedTags.length > 0 || onlyDeadLinks" class="clear-btn" @click="clearSearch" title="清除搜索">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <line x1="18" y1="6" x2="6" y2="18"/>
           <line x1="6" y1="6" x2="18" y2="18"/>
@@ -57,6 +57,19 @@
           <p v-if="selectedTags.length > 0" class="selected-tags-info">
             已选择 {{ selectedTags.length }} 个标签
           </p>
+        </div>
+
+        <div v-if="deadCount > 0" class="filter-group">
+          <label>链接状态：</label>
+          <div class="tags-filter">
+            <button
+              class="tag-filter-btn"
+              :class="{ active: onlyDeadLinks }"
+              @click="toggleDeadFilter"
+            >
+              仅显示失效（{{ deadCount }}）
+            </button>
+          </div>
         </div>
       </div>
     </Transition>
@@ -103,7 +116,7 @@
       </div>
     </Transition>
     
-    <div v-if="(query || selectedCategoryId || selectedTags.length > 0) && !showResults" class="search-result-info">
+    <div v-if="(query || selectedCategoryId || selectedTags.length > 0 || onlyDeadLinks) && !showResults" class="search-result-info">
       <span class="result-count">
         找到 <strong>{{ filteredBookmarks.length }}</strong> 个书签
       </span>
@@ -147,7 +160,7 @@ import { debounce } from '../utils/helpers'
 
 const emit = defineEmits(['scrollToBookmark'])
 
-const { searchQuery, searchCategoryId, searchTags, categories, filteredBookmarks, bookmarks, allTags } = useBookmarks()
+const { searchQuery, searchCategoryId, searchTags, categories, filteredBookmarks, bookmarks, allTags, onlyDeadLinks } = useBookmarks()
 const { getAvailableEngines, openSearchEngine, enabledSearchEnginesPanel } = useSearchEngines()
 const query = ref('')
 const selectedCategoryId = ref(null)
@@ -239,8 +252,18 @@ const clearSearch = () => {
   searchQuery.value = ''
   searchCategoryId.value = null
   searchTags.value = []
+  onlyDeadLinks.value = false
   showResults.value = false
   showEngines.value = false
+}
+
+// 失效书签数量（仅在检测过之后才显示筛选入口）
+const deadCount = computed(() =>
+  bookmarks.value.filter(b => b.check_status === 'fail').length
+)
+
+const toggleDeadFilter = () => {
+  onlyDeadLinks.value = !onlyDeadLinks.value
 }
 
 // 点击搜索结果项，滚动到对应书签

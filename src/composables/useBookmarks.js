@@ -7,6 +7,7 @@ const bookmarks = ref([])
 const searchQuery = ref('')
 const searchCategoryId = ref(null) // 分类过滤
 const searchTags = ref([]) // 标签过滤
+const onlyDeadLinks = ref(false) // 仅显示检测失效的书签
 
 export function useBookmarks() {
   const { getAuthHeaders, logout, apiRequest } = useAuth()
@@ -32,6 +33,11 @@ export function useBookmarks() {
       })
     }
     
+    // 仅显示失效书签
+    if (onlyDeadLinks.value) {
+      result = result.filter(bookmark => bookmark.check_status === 'fail')
+    }
+
     // 关键词搜索
     if (searchQuery.value) {
       const query = searchQuery.value.toLowerCase()
@@ -377,6 +383,7 @@ export function useBookmarks() {
     searchQuery,
     searchCategoryId,
     searchTags,
+    onlyDeadLinks,
     filteredBookmarks,
     bookmarksByCategory,
     allTags,

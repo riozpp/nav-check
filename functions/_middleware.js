@@ -65,6 +65,11 @@ export async function onRequest(context) {
   if (url.pathname === '/api/login') {
     return await next();
   }
+
+  // 定时全量检测由外部调度器用 CRON_SECRET 鉴权，不走登录 token 校验
+  if (url.pathname === '/api/bookmarks/check-all') {
+    return await next();
+  }
   
   // GET请求的bookmarks、categories、settings和AI状态不需要登录即可访问（只读）
   if (request.method === 'GET' && 

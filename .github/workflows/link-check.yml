@@ -1,0 +1,45 @@
+name: 定时检测失效书签
+
+# 每天定时调用站点的 /api/bookmarks/check-all 接口做滚动全量检测。
+# 需要在本仓库 Settings → Secrets and variables → Actions 中配置：
+#   SITE_URL    站点地址，例如 https://sq.20240225.xyz
+#   CRON_SECRET 与 Cloudflare Pages 项目环境变量 CRON_SECRET 保持一致
+on:
+  schedule:
+    # 每天北京时间 04:00（UTC 20:00）
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: '本次检测数量'
+        required: false
+        default: '100'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 调用检测接口
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LIMIT: ${{ github.event.inputs.limit || '100' }}
+        run: |
+          if [ -z "$SITE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "缺少 SITE_URL 或 CRON_SECRET 仓库密钥，跳过"
+            exit 0
+          fi
+          # 每次 100 个，循环 5 轮覆盖更多书签；单次失败不中断
+          for i in 1 2 3 4 5; do
+            echo "===== 第 $i 轮 ====="
+            code=$(curl -s -o resp.json -w '%{http_code}' -X POST "$SITE_URL/api/bookmarks/check-all" \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              -H "Content-Type: application/json" \
+              -d "{\"limit\": $LIMIT}")
+            cat resp.json
+            echo
+            if [ "$code" != "200" ]; then
+              echo "请求失败（HTTP $code），终止"
+              exit 1
+            fi
+          done
