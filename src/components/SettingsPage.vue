@@ -208,7 +208,8 @@ const componentProps = computed(() => ({
   footerContent: props.footerContent,
   totalBookmarks: totalBookmarks.value,
   privateBookmarks: privateBookmarks.value,
-  emptyCategoryCount: props.emptyCategoryCount
+  emptyCategoryCount: props.emptyCategoryCount,
+  failCount: props.bookmarks.filter(b => b.check_status === 'fail').length
 }))
 
 const open = () => {

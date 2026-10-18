@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   is_private INTEGER DEFAULT 0,
   tags TEXT DEFAULT '',
   notes TEXT DEFAULT '',
+  check_status TEXT DEFAULT '',
+  check_code INTEGER DEFAULT NULL,
+  check_time TEXT DEFAULT '',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE

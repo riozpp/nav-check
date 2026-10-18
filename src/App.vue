@@ -243,6 +243,12 @@
     <BatchAIGenerateDialog ref="batchAIGenerateDialog" />
     <BatchAIClassifyDialog ref="batchAIClassifyDialog" />
     <BackupDialog ref="backupDialog" />
+    <LinkCheckDialog
+      ref="linkCheckDialog"
+      :bookmark-list="bookmarks"
+      @checked="refreshAfterCheck"
+      @deleteBookmark="handleDeleteById"
+    />
     
     <!-- Settings Page -->
     <SettingsPage 
@@ -315,6 +321,7 @@ import BatchOperationDialog from './components/BatchOperationDialog.vue'
 import BatchAIGenerateDialog from './components/BatchAIGenerateDialog.vue'
 import BatchAIClassifyDialog from './components/BatchAIClassifyDialog.vue'
 import BackupDialog from './components/BackupDialog.vue'
+import LinkCheckDialog from './components/LinkCheckDialog.vue'
 import UpdateNotification from './components/UpdateNotification.vue'
 import ToastNotification from './components/ToastNotification.vue'
 import AvatarMenu from './components/AvatarMenu.vue'
@@ -374,6 +381,7 @@ const batchOperationDialog = ref(null)
 const batchAIGenerateDialog = ref(null)
 const batchAIClassifyDialog = ref(null)
 const backupDialog = ref(null)
+const linkCheckDialog = ref(null)
 const settingsPage = ref(null)
 const toast = ref(null)
 
@@ -716,6 +724,10 @@ const handleSettingsAction = (action) => {
       // 清理空分类保持在设置页面内
       handleCleanupEmptyCategories()
       break
+    case 'linkCheck':
+      // 书签有效性检测保持在设置页面内
+      linkCheckDialog.value.open()
+      break
     case 'addBookmark':
       // 其他操作需要关闭设置页面
       settingsPage.value.close()
@@ -742,6 +754,28 @@ const checkEmptyCategories = async () => {
   } catch (error) {
     // 静默失败，不影响用户体验
     console.error('Failed to check empty categories:', error)
+  }
+}
+
+const refreshAfterCheck = async () => {
+  // 检测完成后刷新书签数据，让卡片上的状态标记与设置页统计保持最新
+  await fetchData()
+}
+
+const handleDeleteById = async (id) => {
+  const bookmark = bookmarks.value.find(b => b.id === id)
+  if (!bookmark) return
+  const confirmed = await confirmDialog.value.open(
+    `确定要删除失效书签"${bookmark.name}"吗？`,
+    '删除书签'
+  )
+  if (confirmed) {
+    const result = await deleteBookmark(id)
+    if (result.success) {
+      toastSuccess('书签已删除')
+    } else {
+      toastError(result.error || '删除书签失败')
+    }
   }
 }
 

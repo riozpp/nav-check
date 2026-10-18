@@ -50,6 +50,16 @@
       <h4 class="card-title">
         <HighlightText :text="bookmark.name" :query="searchQuery" />
       </h4>
+      <span
+        v-if="bookmark.check_status === 'ok'"
+        class="check-badge ok"
+        title="链接正常（最近检测：{{ formatCheckTime }}）"
+      >✓</span>
+      <span
+        v-else-if="bookmark.check_status === 'fail'"
+        class="check-badge fail"
+        title="链接失效（最近检测：{{ formatCheckTime }}）"
+      >✕</span>
     </div>
     
     <p class="card-description">
@@ -356,8 +366,16 @@ const handleDrop = (e) => {
   isDragOver.value = false
 }
 
-const hoverTitle = computed(() => {
-  const parts = []
+const formatCheckTime = computed(() => {
+  if (!props.bookmark.check_time) return '未知时间'
+  try {
+    return new Date(props.bookmark.check_time).toLocaleString('zh-CN')
+  } catch {
+    return props.bookmark.check_time
+  }
+})
+
+const hoverTitle = computed(() => {  const parts = []
   parts.push(`名称：${props.bookmark.name || ''}`)
   parts.push(`地址：${props.bookmark.url || ''}`)
   if (props.bookmark.description) {
@@ -626,5 +644,29 @@ const handleKeydown = (event) => {
   .drag-handle {
     opacity: 0.6;
   }
+}
+</style>
+
+<style scoped>
+.check-badge {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+  margin-left: auto;
+  cursor: help;
+}
+
+.check-badge.ok {
+  background: #22c55e;
+}
+
+.check-badge.fail {
+  background: #ef4444;
 }
 </style>

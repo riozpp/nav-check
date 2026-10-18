@@ -46,6 +46,24 @@
       </button>
     </div>
     
+    <!-- 链接有效性检测 -->
+    <div class="form-group">
+      <div class="form-header">
+        <div class="form-title">书签有效性检测</div>
+        <div class="form-description">
+          <span v-if="failCount > 0">
+            上次检测发现 {{ failCount }} 个失效书签
+          </span>
+          <span v-else>
+            批量检测书签 URL 是否可以正常访问
+          </span>
+        </div>
+      </div>
+      <button class="text-btn" @click="$emit('action', 'linkCheck')">
+        开始检测
+      </button>
+    </div>
+
     <!-- 统计信息 -->
     <div class="form-group">
       <div class="form-header">
@@ -62,6 +80,10 @@
 defineProps({
   totalBookmarks: Number,
   privateBookmarks: Number,
+  failCount: {
+    type: Number,
+    default: 0
+  },
   emptyCategoryCount: {
     type: Number,
     default: 0
