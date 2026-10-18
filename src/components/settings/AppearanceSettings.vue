@@ -124,6 +124,26 @@
       </div>
     </div>
     
+    <!-- 书签排序方式 -->
+    <div class="form-group">
+      <label class="form-label">书签排序</label>
+      <div class="form-row">
+        <select
+          class="form-select"
+          :value="sortMode"
+          @change="handleSortModeChange"
+        >
+          <option value="manual">↕️ 手动排序（拖拽）</option>
+          <option value="clicks">🔥 最常访问</option>
+          <option value="recent">🆕 最近添加</option>
+          <option value="name">🔤 按名称</option>
+        </select>
+      </div>
+      <div class="form-hint">
+        {{ sortModeHint }}
+      </div>
+    </div>
+
     <!-- 显示搜索栏 -->
     <div class="form-group">
       <label class="form-label">显示搜索栏</label>
@@ -332,7 +352,11 @@ const props = defineProps({
   footerContent: String,
   randomWallpaper: Boolean,
   wallpaperApi: String,
-  displayMode: String
+  displayMode: String,
+  sortMode: {
+    type: String,
+    default: 'manual'
+  }
 })
 
 const emit = defineEmits([
@@ -394,6 +418,20 @@ const handleThemeChange = (event) => {
 const handleDisplayModeChange = (event) => {
   emit('setDisplayMode', event.target.value)
 }
+
+const handleSortModeChange = (event) => {
+  emit('setSortMode', event.target.value)
+}
+
+const sortModeHint = computed(() => {
+  const map = {
+    manual: '按自定义顺序排列，可拖拽调整',
+    clicks: '按点击次数从多到少，常用站点自动靠前',
+    recent: '最新添加的书签排在最前',
+    name: '按名称拼音字母顺序排列'
+  }
+  return map[props.sortMode] || '按自定义顺序排列'
+})
 
 const handleConfirm = () => {
   error.value = ''

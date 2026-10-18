@@ -47,6 +47,9 @@ async function validateToken(token, env) {
   }
 }
 
+// 书签点击计数路径：/api/bookmarks/<id>/click
+const POST_CLICK_PATTERN = /^\/api\/bookmarks\/\d+\/click$/;
+
 // JWT验证中间件
 export async function onRequest(context) {
   const { request, env, next } = context;
@@ -68,6 +71,11 @@ export async function onRequest(context) {
 
   // 定时全量检测由外部调度器用 CRON_SECRET 鉴权，不走登录 token 校验
   if (url.pathname === '/api/bookmarks/check-all') {
+    return await next();
+  }
+
+  // 书签点击计数：公开动作，任何访客都可上报
+  if (POST_CLICK_PATTERN.test(url.pathname) && request.method === 'POST') {
     return await next();
   }
   

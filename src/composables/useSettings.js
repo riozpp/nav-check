@@ -10,6 +10,7 @@ const publicMode = ref(localStorage.getItem('publicMode') !== 'false')
 const randomWallpaper = ref(localStorage.getItem('randomWallpaper') === 'true')
 const wallpaperApi = ref(localStorage.getItem('wallpaperApi') || '')
 const displayMode = ref(localStorage.getItem('displayMode') || 'standard')
+const sortMode = ref(localStorage.getItem('sortMode') || 'manual')
 const avatarUrl = ref(localStorage.getItem('avatarUrl') || '')
 
 // 加载标志位，避免循环触发
@@ -180,6 +181,13 @@ export function useSettings() {
     localStorage.setItem('displayMode', mode)
     
     await saveSettingsToDB({ displayMode: mode })
+  }
+
+  // 排序方式：manual 手动排序 / clicks 最常访问 / recent 最近添加 / name 名称
+  const setSortMode = async (mode) => {
+    sortMode.value = mode
+    localStorage.setItem('sortMode', mode)
+    await saveSettingsToDB({ sortMode: mode })
   }
   
   const updateAvatarUrl = async (url) => {
@@ -433,6 +441,8 @@ export function useSettings() {
     toggleRandomWallpaper,
     updateWallpaperApi,
     setDisplayMode,
+    sortMode,
+    setSortMode,
     updateAvatarUrl,
     applyWallpaper,
     removeWallpaper,

@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { useAuth } from './useAuth'
 import { useToast } from './useToast'
+import { useSettings } from './useSettings'
 
 const categories = ref([])
 const bookmarks = ref([])
@@ -11,6 +12,7 @@ const onlyDeadLinks = ref(false) // 仅显示检测失效的书签
 
 export function useBookmarks() {
   const { getAuthHeaders, logout, apiRequest } = useAuth()
+  const { sortMode } = useSettings()
   const { error: toastError } = useToast()
   
   
@@ -53,12 +55,27 @@ export function useBookmarks() {
     return result
   })
   
+  // 排序方式由设置决定：manual 手动 / clicks 最常访问 / recent 最近添加 / name 名称
+  const sortByMode = (list) => {
+    const mode = sortMode.value
+    if (mode === 'clicks') {
+      return [...list].sort((a, b) => (b.click_count || 0) - (a.click_count || 0))
+    }
+    if (mode === 'recent') {
+      return [...list].sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    }
+    if (mode === 'name') {
+      return [...list].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+    }
+    return [...list].sort((a, b) => a.position - b.position)
+  }
+
   const bookmarksByCategory = computed(() => {
     const result = {}
     categories.value.forEach(category => {
-      result[category.id] = filteredBookmarks.value
-        .filter(b => b.category_id === category.id)
-        .sort((a, b) => a.position - b.position)
+      result[category.id] = sortByMode(
+        filteredBookmarks.value.filter(b => b.category_id === category.id)
+      )
     })
     return result
   })

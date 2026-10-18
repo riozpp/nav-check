@@ -69,6 +69,9 @@
             >
               仅显示失效（{{ deadCount }}）
             </button>
+            <button class="tag-filter-btn clean-btn" @click="openDeadManager">
+              批量清理
+            </button>
           </div>
         </div>
       </div>
@@ -158,7 +161,7 @@ import { useSearchEngines } from '../composables/useSearchEngines'
 import { buildCategoryTree, getCategoryPath } from '../utils/categoryTree'
 import { debounce } from '../utils/helpers'
 
-const emit = defineEmits(['scrollToBookmark'])
+const emit = defineEmits(['scrollToBookmark', 'openDeadLinks'])
 
 const { searchQuery, searchCategoryId, searchTags, categories, filteredBookmarks, bookmarks, allTags, onlyDeadLinks } = useBookmarks()
 const { getAvailableEngines, openSearchEngine, enabledSearchEnginesPanel } = useSearchEngines()
@@ -264,6 +267,11 @@ const deadCount = computed(() =>
 
 const toggleDeadFilter = () => {
   onlyDeadLinks.value = !onlyDeadLinks.value
+}
+
+// 清理失效书签：打开批量清理面板
+const openDeadManager = () => {
+  emit('openDeadLinks')
 }
 
 // 点击搜索结果项，滚动到对应书签
@@ -480,6 +488,17 @@ html.dark .filter-panel {
   background: rgba(99, 102, 241, 0.1);
   color: var(--primary);
   transform: translateY(-1px);
+}
+
+.tag-filter-btn.clean-btn {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+}
+
+.tag-filter-btn.clean-btn:hover {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
 }
 
 .tag-filter-btn.active {

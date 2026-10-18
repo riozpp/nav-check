@@ -236,12 +236,27 @@ const handleIconError = () => {
 
 const handleClick = () => {
   if (!props.isEditMode) {
+    recordClick(props.bookmark)
     window.open(props.bookmark.url, '_blank')
     return
   }
   
   if (props.isBatchMode) {
     emit('toggleSelect', props.bookmark.id)
+  }
+}
+
+// 静默上报点击次数，失败不影响跳转
+const recordClick = (bookmark) => {
+  try {
+    // 本地先累加，让「最常用」排序即时生效
+    bookmark.click_count = (bookmark.click_count || 0) + 1
+    fetch(`/api/bookmarks/${bookmark.id}/click`, {
+      method: 'POST',
+      keepalive: true
+    }).catch(() => {})
+  } catch {
+    // 忽略
   }
 }
 

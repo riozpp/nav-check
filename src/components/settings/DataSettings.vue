@@ -99,6 +99,32 @@
       </div>
     </div>
 
+    <!-- 书签数据体检 -->
+    <div class="form-group">
+      <div class="form-header">
+        <div class="form-title">书签数据体检</div>
+        <div class="form-description">
+          一键检查缺图标、缺描述、缺标签、失效链接与畸形 URL，并批量修复
+        </div>
+      </div>
+      <button class="text-btn" @click="$emit('action', 'maintenance')">
+        开始体检
+      </button>
+    </div>
+
+    <!-- 批量替换 URL -->
+    <div class="form-group">
+      <div class="form-header">
+        <div class="form-title">批量替换 URL</div>
+        <div class="form-description">
+          按「查找-替换」批量修改书签地址，适合 NAS IP 或域名变更时批量更新
+        </div>
+      </div>
+      <button class="text-btn" @click="$emit('action', 'replaceUrl')">
+        查找替换
+      </button>
+    </div>
+
     <!-- 统计信息 -->
     <div class="form-group">
       <div class="form-header">

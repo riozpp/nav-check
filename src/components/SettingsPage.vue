@@ -85,6 +85,7 @@
               @toggleRandomWallpaper="$emit('toggleRandomWallpaper')"
               @updateWallpaperApi="$emit('updateWallpaperApi', $event)"
               @setDisplayMode="$emit('setDisplayMode', $event)"
+              @setSortMode="$emit('setSortMode', $event)"
             />
           </div>
         </div>
@@ -206,6 +207,7 @@ const componentProps = computed(() => ({
   randomWallpaper: props.randomWallpaper,
   wallpaperApi: props.wallpaperApi,
   displayMode: props.displayMode,
+  sortMode: props.sortMode,
   footerContent: props.footerContent,
   totalBookmarks: totalBookmarks.value,
   privateBookmarks: privateBookmarks.value,

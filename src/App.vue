@@ -43,7 +43,7 @@
       </div>
       
       <div v-if="showSearch" class="header-search">
-        <SearchBar @scrollToBookmark="handleScrollToBookmark" />
+        <SearchBar @scrollToBookmark="handleScrollToBookmark" @openDeadLinks="maintenanceDialog.open('dead')" />
       </div>
       
       <!-- Edit Mode Toolbar -->
@@ -194,6 +194,7 @@
               :selected-ids="selectedIds"
               :selected-category-ids="selectedCategoryIds"
               :display-mode="displayMode"
+      :sort-mode="sortMode"
               @select-category="handleSelectCategory"
               @edit-category="handleEditCategory"
               @delete-category="handleDeleteCategory"
@@ -243,6 +244,12 @@
     <BatchAIGenerateDialog ref="batchAIGenerateDialog" />
     <BatchAIClassifyDialog ref="batchAIClassifyDialog" />
     <BackupDialog ref="backupDialog" />
+    <MaintenanceDialog
+      ref="maintenanceDialog"
+      @aiDescriptions="handleBatchAIDescriptions"
+      @linkCheck="linkCheckDialog.open()"
+      @refresh="refreshAfterCheck"
+    />
     <LinkCheckDialog
       ref="linkCheckDialog"
       :bookmark-list="bookmarks"
@@ -274,6 +281,7 @@
       @set-theme-mode="setThemeMode"
       @set-theme-style="setThemeStyle"
       @toggle-search="toggleSearch"
+      @set-sort-mode="setSortMode"
       @toggle-hide-empty="toggleHideEmptyCategories"
       @toggle-public-mode="togglePublicMode"
       @toggle-random-wallpaper="toggleRandomWallpaper"
@@ -323,6 +331,7 @@ import BatchAIGenerateDialog from './components/BatchAIGenerateDialog.vue'
 import BatchAIClassifyDialog from './components/BatchAIClassifyDialog.vue'
 import BackupDialog from './components/BackupDialog.vue'
 import LinkCheckDialog from './components/LinkCheckDialog.vue'
+import MaintenanceDialog from './components/MaintenanceDialog.vue'
 import UpdateNotification from './components/UpdateNotification.vue'
 import ToastNotification from './components/ToastNotification.vue'
 import AvatarMenu from './components/AvatarMenu.vue'
@@ -350,7 +359,7 @@ const {
   cleanupEmptyCategories
 } = useBookmarks()
 const { themeMode, themeStyle, isDark, setThemeMode, setThemeStyle, toggleTheme, loadThemeFromDB } = useTheme()
-const { showSearch, hideEmptyCategories, customTitle, footerContent, activeSettingsTab, publicMode, randomWallpaper, wallpaperApi, displayMode, avatarUrl, toggleSearch, toggleHideEmptyCategories, togglePublicMode, updateCustomTitle, updateFooterContent, setActiveSettingsTab, toggleRandomWallpaper, updateWallpaperApi, setDisplayMode, updateAvatarUrl, applyWallpaper, loadSettingsFromDB } = useSettings()
+const { showSearch, hideEmptyCategories, customTitle, footerContent, activeSettingsTab, publicMode, randomWallpaper, wallpaperApi, displayMode, avatarUrl, toggleSearch, toggleHideEmptyCategories, togglePublicMode, updateCustomTitle, updateFooterContent, setActiveSettingsTab, toggleRandomWallpaper, updateWallpaperApi, setDisplayMode, sortMode, setSortMode, updateAvatarUrl, applyWallpaper, loadSettingsFromDB } = useSettings()
 const { setToastInstance, success: toastSuccess, error: toastError } = useToast()
 const {
   isBatchMode,
@@ -383,6 +392,7 @@ const batchAIGenerateDialog = ref(null)
 const batchAIClassifyDialog = ref(null)
 const backupDialog = ref(null)
 const linkCheckDialog = ref(null)
+const maintenanceDialog = ref(null)
 const settingsPage = ref(null)
 const toast = ref(null)
 
@@ -729,6 +739,12 @@ const handleSettingsAction = (action) => {
       // 书签有效性检测保持在设置页面内
       linkCheckDialog.value.open()
       break
+    case 'maintenance':
+      maintenanceDialog.value.open('health')
+      break
+    case 'replaceUrl':
+      maintenanceDialog.value.open('replace')
+      break
     case 'addBookmark':
       // 其他操作需要关闭设置页面
       settingsPage.value.close()
@@ -761,6 +777,17 @@ const checkEmptyCategories = async () => {
 const refreshAfterCheck = async () => {
   // 检测完成后刷新书签数据，让卡片上的状态标记与设置页统计保持最新
   await fetchData()
+}
+
+// 从体检面板直接为「缺描述」的书签打开 AI 生成对话框
+const handleBatchAIDescriptions = () => {
+  const targets = bookmarks.value.filter(b => !b.description || !b.description.trim())
+  if (targets.length === 0) {
+    toastSuccess('所有书签都已有描述')
+    return
+  }
+  maintenanceDialog.value?.close?.()
+  batchAIGenerateDialog.value?.open(targets.slice(0, 50))
 }
 
 const handleDeleteById = async (id) => {
@@ -965,6 +992,10 @@ const handleToggleSelection = (bookmarkId) => {
 const handleToggleCategorySelection = (categoryId) => {
   if (!isBatchMode.value) return
   toggleCategorySelection(categoryId)
+}
+
+const handleCleanDeadLinks = () => {
+  maintenanceDialog.value.open('dead')
 }
 
 const handleBatchDelete = async () => {
