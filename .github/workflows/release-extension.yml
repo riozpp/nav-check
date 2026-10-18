@@ -1,0 +1,78 @@
+name: Build and Release Browser Extension
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION=$(echo "$VERSION" | sed 's/^v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Building extension version: $VERSION"
+
+      - name: Update extension manifest versions
+        working-directory: browser-extension
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Updating manifests to version: $VERSION"
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" manifest.json
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" manifest.firefox.json
+          echo "✅ Updated manifests to version $VERSION"
+          echo "Verifying:"
+          grep '"version"' manifest.json || true
+          grep '"version"' manifest.firefox.json || true
+          echo "✅ Version update completed"
+
+      - name: Make package script executable
+        run: chmod +x browser-extension/package.sh
+
+      - name: Build extension packages
+        working-directory: browser-extension
+        run: ./package.sh
+
+      - name: Verify package files
+        run: |
+          if [ ! -f browser-extension/dist/bookmark-manager-chromium.zip ]; then
+            echo "❌ Chromium package not found!"
+            exit 1
+          fi
+          if [ ! -f browser-extension/dist/bookmark-manager-firefox.zip ]; then
+            echo "❌ Firefox package not found!"
+            exit 1
+          fi
+          echo "✅ All packages generated successfully"
+          ls -lh browser-extension/dist/*.zip
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            browser-extension/dist/bookmark-manager-chromium.zip
+            browser-extension/dist/bookmark-manager-firefox.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build summary
+        run: |
+          echo "## ✅ Browser Extension Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Uploaded Files" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ bookmark-manager-chromium.zip" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ bookmark-manager-firefox.zip" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Files are available in the [Release](${{ github.event.release.html_url }})" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+# package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+dist/
+.output/
+browser-extension/dist/
+
+# Environment
+.env
+.dev.vars
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Images (keep directory structure but ignore system files)
+images/.DS_Store
+
+# Wrangler
+.wrangler/
+wrangler.toml.backup
+wrangler.toml

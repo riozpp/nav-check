@@ -1,0 +1,28 @@
+{
+  "name": "bookmark-manager",
+  "version": "1.6.4",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler pages deploy dist",
+    "ext:build": "bash browser-extension/package.sh",
+    "ext:build:chromium": "bash -lc 'cd browser-extension && rm -rf dist && mkdir -p dist/chromium && cp manifest.json dist/chromium/ && cp popup.html popup.js dist/chromium/ && cp options.html options.js dist/chromium/ && cp background.js dist/chromium/ && cp styles.css dist/chromium/ && cp -r icons dist/chromium/ && cd dist/chromium && zip -r ../bookmark-manager-chromium.zip . -q'",
+    "ext:build:firefox": "bash -lc 'cd browser-extension && rm -rf dist && mkdir -p dist/firefox && cp manifest.firefox.json dist/firefox/manifest.json && cp popup.html popup.js dist/firefox/ && cp options.html options.js dist/firefox/ && cp background.firefox.js dist/firefox/background.js && cp styles.css dist/firefox/ && cp -r icons dist/firefox/ && cd dist/firefox && zip -r ../bookmark-manager-firefox.zip . -q'",
+    "db:create": "wrangler d1 create bookmark-db",
+    "db:init:local": "wrangler d1 execute bookmark-db --local --file=schema.sql",
+    "db:init:remote": "wrangler d1 execute bookmark-db --remote --file=schema.sql",
+    "db:migrate:indexes": "wrangler d1 execute bookmark-db --remote --file=migration-add-indexes.sql"
+  },
+  "dependencies": {
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240000.0",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vite": "^5.0.0",
+    "wrangler": "^3.0.0"
+  }
+}
+
