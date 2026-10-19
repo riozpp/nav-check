@@ -119,6 +119,25 @@
           <p v-else class="setting-note">
             环境变量：<code>OPENAI_MODEL</code>
           </p>
+
+          <!-- 从服务端拉取的模型列表 -->
+          <div v-if="availableModels.length > 0" class="model-picker">
+            <p class="setting-note">
+              检测到 {{ availableModels.length }} 个可用模型，点击快速填入：
+            </p>
+            <div class="model-chips">
+              <button
+                v-for="m in availableModels.slice(0, 20)"
+                :key="m"
+                type="button"
+                class="model-chip"
+                :class="{ active: localModel === m }"
+                @click="localModel = m"
+              >
+                {{ m }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="advanced-settings">
@@ -202,6 +221,15 @@
             <span v-else>保存配置</span>
           </button>
           <button
+            class="btn btn-secondary"
+            @click="runDiagnose"
+            :disabled="diagnosing || saving || (!localApiKey && !hasApiKey)"
+            :title="hasApiKey ? '使用已保存的配置进行检测' : '请先填写 API Key'"
+          >
+            <span v-if="diagnosing">检测中...</span>
+            <span v-else>🔍 检测配置</span>
+          </button>
+          <button
             v-if="hasChanges"
             class="btn btn-secondary"
             @click="resetSettings"
@@ -209,6 +237,30 @@
           >
             取消
           </button>
+        </div>
+
+        <!-- 检测结果 -->
+        <div v-if="diagnoseSteps.length > 0" class="diagnose-panel" :class="diagnoseOk ? 'ok' : 'fail'">
+          <div class="diagnose-header">
+            <strong>{{ diagnoseOk ? '✅ 配置可用' : '❌ 配置有问题' }}</strong>
+            <button class="diagnose-close" @click="diagnoseSteps = []">×</button>
+          </div>
+          <div
+            v-for="(step, i) in diagnoseSteps"
+            :key="i"
+            class="diagnose-step"
+            :class="{ ok: step.ok, bad: !step.ok }"
+          >
+            <span class="step-icon">{{ step.ok ? (step.warning ? '⚠️' : '✓') : '✕' }}</span>
+            <div class="step-body">
+              <div class="step-msg">{{ step.message }}</div>
+              <div v-if="step.detail" class="step-detail">{{ step.detail }}</div>
+              <div v-if="step.reply" class="step-detail">模型回复：{{ step.reply }}</div>
+              <div v-if="step.suggestions && step.suggestions.length" class="step-suggest">
+                可用模型示例：{{ step.suggestions.join('、') }}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -311,7 +363,7 @@ import { useAI } from '../../composables/useAI'
 import { useAuth } from '../../composables/useAuth'
 import { useToast } from '../../composables/useToast'
 
-const { isAuthenticated } = useAuth()
+const { isAuthenticated, apiRequest } = useAuth()
 const { aiEnabled, aiSource, checkAIAvailability, saveAISettings, getAISettings } = useAI()
 const { success: toastSuccess, error: toastError } = useToast()
 
@@ -322,6 +374,13 @@ const localAuthHeader = ref('Authorization')
 const localAuthPrefix = ref('Bearer ')
 const showAdvanced = ref(false)
 const saving = ref(false)
+
+// 配置自检
+const diagnosing = ref(false)
+const diagnoseSteps = ref([])
+const diagnoseOk = ref(false)
+const availableModels = ref([])
+const hasApiKey = ref(false)
 
 const showApiKey = ref(false)
 
@@ -362,6 +421,7 @@ const loadSettings = async () => {
     localAuthHeader.value = result.authHeader || 'Authorization'
     localAuthPrefix.value = result.authPrefix !== undefined ? result.authPrefix : 'Bearer '
     lockedFields.value = result.lockedFields || {}
+    hasApiKey.value = Boolean(result.hasApiKey)
 
     originalSettings.value = {
       apiKey: localApiKey.value,
@@ -370,6 +430,42 @@ const loadSettings = async () => {
       authHeader: localAuthHeader.value,
       authPrefix: localAuthPrefix.value
     }
+  }
+}
+
+// AI 配置自检：连通性 → 模型列表 → 模型是否存在 → 实际对话
+const runDiagnose = async () => {
+  diagnosing.value = true
+  diagnoseSteps.value = []
+  availableModels.value = []
+  try {
+    const response = await apiRequest('/api/ai/diagnose', {
+      method: 'POST',
+      body: JSON.stringify({
+        // 表单里填了就用表单值（支持"保存前先测"），否则用已保存配置
+        apiKey: localApiKey.value || undefined,
+        baseUrl: localBaseUrl.value || undefined,
+        model: localModel.value || undefined,
+        authHeader: localAuthHeader.value || undefined,
+        authPrefix: localAuthPrefix.value
+      })
+    })
+    const data = await response.json()
+    diagnoseSteps.value = data.steps || []
+    diagnoseOk.value = Boolean(data.success)
+    if (Array.isArray(data.modelList) && data.modelList.length) {
+      availableModels.value = data.modelList
+    }
+    if (data.success) {
+      toastSuccess('AI 配置检测通过，模型可正常调用')
+    } else {
+      toastError(data.error || '检测未通过，请查看下方详情')
+    }
+  } catch (error) {
+    diagnoseSteps.value = [{ stage: 'error', ok: false, message: error.message || '检测请求失败' }]
+    diagnoseOk.value = false
+  } finally {
+    diagnosing.value = false
   }
 }
 

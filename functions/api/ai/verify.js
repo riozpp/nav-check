@@ -38,7 +38,7 @@ export async function onRequestPost(context) {
     const authHeader = settings.ai_auth_header || 'Authorization'
     const authPrefix = settings.ai_auth_prefix !== undefined ? settings.ai_auth_prefix : 'Bearer '
 
-    const url = joinBaseUrl(finalBaseUrl, '/models')
+    const url = joinBaseUrl(finalBaseUrl, 'models')
 
     const finalHeaders = new Headers()
     finalHeaders.set(authHeader, `${authPrefix || ''}${apiKey}`)
