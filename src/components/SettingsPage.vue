@@ -81,6 +81,7 @@
               @setThemeStyle="$emit('setThemeStyle', $event)"
               @toggleSearch="$emit('toggleSearch')"
               @toggleHideEmpty="$emit('toggleHideEmpty')"
+              @toggleShowTags="$emit('toggleShowTags')"
               @togglePublicMode="$emit('togglePublicMode')"
               @toggleRandomWallpaper="$emit('toggleRandomWallpaper')"
               @updateWallpaperApi="$emit('updateWallpaperApi', $event)"
@@ -165,10 +166,14 @@ const props = defineProps({
   displayMode: {
     type: String,
     default: 'standard'
+  },
+  showTags: {
+    type: Boolean,
+    default: true
   }
 })
 
-const emit = defineEmits(['action', 'close', 'reloadData', 'setThemeMode', 'setThemeStyle', 'toggleSearch', 'toggleHideEmpty', 'togglePublicMode', 'updateTitle', 'updateFooter', 'editTitle', 'editFooter', 'setActiveTab', 'toggleRandomWallpaper', 'updateWallpaperApi', 'setDisplayMode', 'uploadAvatar'])
+const emit = defineEmits(['action', 'close', 'reloadData', 'setThemeMode', 'setThemeStyle', 'toggleSearch', 'toggleHideEmpty', 'toggleShowTags', 'togglePublicMode', 'updateTitle', 'updateFooter', 'editTitle', 'editFooter', 'setActiveTab', 'toggleRandomWallpaper', 'updateWallpaperApi', 'setDisplayMode', 'uploadAvatar'])
 
 const menuItems = ref([
   { id: 'appearance', name: '外观设置' },
@@ -208,6 +213,7 @@ const componentProps = computed(() => ({
   wallpaperApi: props.wallpaperApi,
   displayMode: props.displayMode,
   sortMode: props.sortMode,
+  showTags: props.showTags,
   footerContent: props.footerContent,
   totalBookmarks: totalBookmarks.value,
   privateBookmarks: privateBookmarks.value,

@@ -11,6 +11,8 @@ const randomWallpaper = ref(localStorage.getItem('randomWallpaper') === 'true')
 const wallpaperApi = ref(localStorage.getItem('wallpaperApi') || '')
 const displayMode = ref(localStorage.getItem('displayMode') || 'standard')
 const sortMode = ref(localStorage.getItem('sortMode') || 'manual')
+// 是否在卡片上显示标签，默认显示（兼容老数据）
+const showTags = ref(localStorage.getItem('showTags') !== 'false')
 const avatarUrl = ref(localStorage.getItem('avatarUrl') || '')
 
 // 加载标志位，避免循环触发
@@ -67,6 +69,10 @@ export function useSettings() {
             displayMode.value = data.data.displayMode
             localStorage.setItem('displayMode', data.data.displayMode)
           }
+          if (data.data.showTags !== undefined) {
+            showTags.value = data.data.showTags !== 'false'
+            localStorage.setItem('showTags', data.data.showTags)
+          }
           if (data.data.avatarUrl !== undefined) {
             avatarUrl.value = data.data.avatarUrl || ''
             localStorage.setItem('avatarUrl', data.data.avatarUrl || '')
@@ -113,6 +119,14 @@ export function useSettings() {
     
     // 保存到数据库
     await saveSettingsToDB({ hideEmptyCategories: hideEmptyCategories.value.toString() })
+  }
+  
+  const toggleShowTags = async () => {
+    showTags.value = !showTags.value
+    localStorage.setItem('showTags', showTags.value.toString())
+    
+    // 保存到数据库
+    await saveSettingsToDB({ showTags: showTags.value.toString() })
   }
   
   const updateCustomTitle = async (title) => {
@@ -276,6 +290,24 @@ export function useSettings() {
     }
   })
   
+  watch(showTags, async (newValue) => {
+    if (!isLoadingFromDB.value) {
+      localStorage.setItem('showTags', newValue.toString())
+      if (isAuthenticated.value) {
+        try {
+          await apiRequest('/api/settings', {
+            method: 'POST',
+            body: JSON.stringify({ settings: { showTags: newValue.toString() } })
+          })
+        } catch (error) {
+          if (error.message === 'Token expired') {
+            console.warn('Token expired, showTags not saved to database')
+          }
+        }
+      }
+    }
+  })
+  
   watch(customTitle, async (newValue) => {
     if (!isLoadingFromDB.value) {
       localStorage.setItem('customTitle', newValue)
@@ -432,8 +464,10 @@ export function useSettings() {
     wallpaperApi,
     displayMode,
     avatarUrl,
+    showTags,
     toggleSearch,
     toggleHideEmptyCategories,
+    toggleShowTags,
     updateCustomTitle,
     updateFooterContent,
     setActiveSettingsTab,

@@ -224,6 +224,23 @@
       <div class="form-hint">不显示没有书签的分类</div>
     </div>
 
+    <!-- 显示标签 -->
+    <div class="form-group">
+      <label class="form-label">显示标签</label>
+      <div class="form-row">
+        <span class="form-text">{{ showTags ? '已开启' : '已关闭' }}</span>
+        <label class="switch">
+          <input 
+            type="checkbox" 
+            :checked="showTags"
+            @change="$emit('toggleShowTags')"
+          >
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="form-hint">关闭后书签卡片上不再显示标签（标签数据仍然保留）</div>
+    </div>
+
     <!-- 公开模式 -->
     <div class="form-group">
       <label class="form-label">访问模式</label>
@@ -356,6 +373,10 @@ const props = defineProps({
   sortMode: {
     type: String,
     default: 'manual'
+  },
+  showTags: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -367,6 +388,7 @@ const emit = defineEmits([
   'setThemeStyle',
   'toggleSearch', 
   'toggleHideEmpty', 
+  'toggleShowTags',
   'togglePublicMode',
   'toggleRandomWallpaper',
   'updateWallpaperApi',

@@ -195,6 +195,7 @@
               :selected-category-ids="selectedCategoryIds"
               :display-mode="displayMode"
       :sort-mode="sortMode"
+              :show-tags="showTags"
               @select-category="handleSelectCategory"
               @edit-category="handleEditCategory"
               @delete-category="handleDeleteCategory"
@@ -241,7 +242,7 @@
     <FooterEditDialog ref="footerEditDialog" />
     <ImportExportDialog ref="importExportDialog" />
     <BatchOperationDialog ref="batchOperationDialog" />
-    <BatchAIGenerateDialog ref="batchAIGenerateDialog" />
+    <BatchAIGenerateDialog ref="batchAIGenerateDialog" @generated="handleAIGenerated" />
     <BatchAIClassifyDialog ref="batchAIClassifyDialog" />
     <BackupDialog ref="backupDialog" />
     <MaintenanceDialog
@@ -269,6 +270,7 @@
       :wallpaper-api="wallpaperApi"
       :display-mode="displayMode"
       :hide-empty-categories="hideEmptyCategories"
+      :show-tags="showTags"
       :public-mode="publicMode"
       :custom-title="customTitle"
       :avatar-url="avatarUrl"
@@ -283,6 +285,7 @@
       @toggle-search="toggleSearch"
       @set-sort-mode="setSortMode"
       @toggle-hide-empty="toggleHideEmptyCategories"
+      @toggle-show-tags="toggleShowTags"
       @toggle-public-mode="togglePublicMode"
       @toggle-random-wallpaper="toggleRandomWallpaper"
       @update-wallpaper-api="updateWallpaperApi"
@@ -359,7 +362,7 @@ const {
   cleanupEmptyCategories
 } = useBookmarks()
 const { themeMode, themeStyle, isDark, setThemeMode, setThemeStyle, toggleTheme, loadThemeFromDB } = useTheme()
-const { showSearch, hideEmptyCategories, customTitle, footerContent, activeSettingsTab, publicMode, randomWallpaper, wallpaperApi, displayMode, avatarUrl, toggleSearch, toggleHideEmptyCategories, togglePublicMode, updateCustomTitle, updateFooterContent, setActiveSettingsTab, toggleRandomWallpaper, updateWallpaperApi, setDisplayMode, sortMode, setSortMode, updateAvatarUrl, applyWallpaper, loadSettingsFromDB } = useSettings()
+const { showSearch, hideEmptyCategories, customTitle, footerContent, activeSettingsTab, publicMode, randomWallpaper, wallpaperApi, displayMode, avatarUrl, showTags, toggleSearch, toggleHideEmptyCategories, toggleShowTags, togglePublicMode, updateCustomTitle, updateFooterContent, setActiveSettingsTab, toggleRandomWallpaper, updateWallpaperApi, setDisplayMode, sortMode, setSortMode, updateAvatarUrl, applyWallpaper, loadSettingsFromDB } = useSettings()
 const { setToastInstance, success: toastSuccess, error: toastError } = useToast()
 const {
   isBatchMode,
@@ -786,8 +789,18 @@ const handleBatchAIDescriptions = () => {
     toastSuccess('所有书签都已有描述')
     return
   }
+  if (!aiEnabled.value) {
+    toastError('AI 功能未启用，请先在设置中配置 AI')
+    return
+  }
   maintenanceDialog.value?.close?.()
-  batchAIGenerateDialog.value?.open(targets.slice(0, 50))
+  // 全部交给对话框做「全部 / 前 N 个」的范围选择
+  batchAIGenerateDialog.value?.open(targets)
+}
+
+// AI 生成描述后立即刷新数据，让新描述在卡片上直接显示
+const handleAIGenerated = async () => {
+  await fetchData()
 }
 
 const handleDeleteById = async (id) => {

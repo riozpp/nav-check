@@ -24,11 +24,44 @@
                 <path d="M12 16v-4"/>
                 <path d="M12 8h.01"/>
               </svg>
-              即将为选中的 <strong>{{ bookmarkCount }}</strong> 个书签生成描述
+              共 <strong>{{ candidates.length }}</strong> 个书签可生成，
+              本次将处理 <strong>{{ bookmarkCount }}</strong> 个
             </p>
-            <p class="warning-text">
-              此操作将使用 AI API 为每个书签生成描述，可能需要一些时间。
-            </p>
+
+            <!-- 范围选择：全部 / 指定数量 -->
+            <div class="option-group">
+              <label class="checkbox-label">
+                <input type="radio" value="all" v-model="scope" />
+                <span>全部（{{ candidates.length }} 个）</span>
+              </label>
+              <label class="checkbox-label" style="margin-top: 0.625rem;">
+                <input type="radio" value="limit" v-model="scope" />
+                <span>只生成前 N 个</span>
+              </label>
+
+              <div v-if="scope === 'limit'" class="limit-row">
+                <input
+                  type="range"
+                  class="limit-range"
+                  :min="1"
+                  :max="Math.max(1, candidates.length)"
+                  step="1"
+                  v-model.number="limitCount"
+                />
+                <input
+                  type="number"
+                  class="limit-input"
+                  min="1"
+                  :max="Math.max(1, candidates.length)"
+                  v-model.number="limitCount"
+                />
+                <span class="limit-total">/ {{ candidates.length }}</span>
+              </div>
+              <p v-if="scope === 'limit'" class="option-hint">
+                数量多时建议分批生成，避免一次请求太久被中断
+              </p>
+            </div>
+
             <div class="option-group">
               <label class="checkbox-label">
                 <input type="checkbox" v-model="overwriteExisting" />
@@ -36,6 +69,10 @@
               </label>
               <p class="option-hint">如果不勾选，将只为没有描述的书签生成</p>
             </div>
+
+            <p class="warning-text">
+              此操作将使用 AI API 逐个生成描述，可能需要一些时间。
+            </p>
           </div>
           
           <div v-if="isGenerating" class="progress-section">
@@ -169,6 +206,9 @@ const selectedBookmarks = ref([])
 const isGenerating = ref(false)
 const completed = ref(false)
 const overwriteExisting = ref(false)
+// 生成范围：all = 全部；limit = 只生成前 limitCount 个
+const scope = ref('all')
+const limitCount = ref(50)
 
 const currentIndex = ref(0)
 const totalCount = ref(0)
@@ -177,12 +217,20 @@ const failedCount = ref(0)
 const currentBookmark = ref(null)
 const results = ref([])
 
-const bookmarkCount = computed(() => {
-  if (!overwriteExisting.value) {
-    return selectedBookmarks.value.filter(b => !b.description || b.description.trim() === '').length
-  }
-  return selectedBookmarks.value.length
+// 候选书签：未勾选覆盖时只保留没有描述的
+const candidates = computed(() => {
+  if (overwriteExisting.value) return selectedBookmarks.value
+  return selectedBookmarks.value.filter(b => !b.description || b.description.trim() === '')
 })
+
+// 实际要处理的列表
+const pendingList = computed(() => {
+  if (scope.value === 'all') return candidates.value
+  const n = Math.min(Math.max(Number(limitCount.value) || 0, 0), candidates.value.length)
+  return candidates.value.slice(0, n)
+})
+
+const bookmarkCount = computed(() => pendingList.value.length)
 
 const progressPercentage = computed(() => {
   if (totalCount.value === 0) return 0
@@ -198,6 +246,8 @@ const open = (bookmarks) => {
   isGenerating.value = false
   completed.value = false
   overwriteExisting.value = false
+  scope.value = 'all'
+  limitCount.value = Math.min(50, bookmarks.length || 1)
   currentIndex.value = 0
   totalCount.value = 0
   successCount.value = 0
@@ -207,15 +257,17 @@ const open = (bookmarks) => {
   show.value = true
 }
 
+// 有书签真的被写入了，通知父级刷新列表
+const emit = defineEmits(['generated'])
+
 const close = () => {
   if (isGenerating.value) return
+  if (successCount.value > 0) emit('generated')
   show.value = false
 }
 
 const startGeneration = async () => {
-  const bookmarksToProcess = overwriteExisting.value 
-    ? selectedBookmarks.value 
-    : selectedBookmarks.value.filter(b => !b.description || b.description.trim() === '')
+  const bookmarksToProcess = pendingList.value
   
   if (bookmarksToProcess.length === 0) {
     toastError('没有需要生成描述的书签')
@@ -238,10 +290,22 @@ const startGeneration = async () => {
       const result = await generateDescription(bookmark.name, bookmark.url)
       
       if (result.success && result.description) {
-        await updateBookmark(bookmark.id, {
+        const res = await updateBookmark(bookmark.id, {
           ...bookmark,
           description: result.description
         })
+        
+        if (res && res.success === false) {
+          failedCount.value++
+          results.value.push({
+            id: bookmark.id,
+            name: bookmark.name,
+            success: false,
+            error: res.error || '保存失败'
+          })
+          await new Promise(resolve => setTimeout(resolve, 500))
+          continue
+        }
         
         successCount.value++
         results.value.push({
@@ -280,6 +344,9 @@ const startGeneration = async () => {
   } else {
     toastError(`生成完成：成功 ${successCount.value} 个，失败 ${failedCount.value} 个`)
   }
+  
+  // 让父级立刻刷新列表，避免要切页面才看到新描述
+  if (successCount.value > 0) emit('generated')
 }
 
 defineExpose({
@@ -416,6 +483,50 @@ defineExpose({
   cursor: pointer;
   width: 18px;
   height: 18px;
+}
+
+.checkbox-label input[type="radio"] {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.limit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-left: 1.75rem;
+}
+
+.limit-range {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.limit-input {
+  width: 80px;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9375rem;
+  text-align: center;
+}
+
+.limit-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.limit-total {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .option-hint {

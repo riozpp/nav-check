@@ -84,6 +84,7 @@
           :is-batch-mode="isBatchMode"
           :is-selected="isBookmarkSelected(bookmark.id)"
           :display-mode="displayMode"
+          :show-tags="showTags"
           @edit="$emit('edit-bookmark', bookmark)"
           @delete="$emit('delete-bookmark', bookmark)"
           @dragstart="handleDragStart"
@@ -150,6 +151,10 @@ const props = defineProps({
   displayMode: {
     type: String,
     default: 'standard'
+  },
+  showTags: {
+    type: Boolean,
+    default: true
   }
 })
 

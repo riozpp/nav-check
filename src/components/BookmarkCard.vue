@@ -71,7 +71,7 @@
       <HighlightText :text="bookmark.description || displayUrl" :query="searchQuery" />
     </p>
     
-    <div v-if="bookmark.tags && bookmark.tags.trim()" class="card-tags">
+    <div v-if="showTags && bookmark.tags && bookmark.tags.trim()" class="card-tags">
       <span 
         v-for="tag in parsedTags" 
         :key="tag" 
@@ -149,6 +149,10 @@ const props = defineProps({
   displayMode: {
     type: String,
     default: 'standard'
+  },
+  showTags: {
+    type: Boolean,
+    default: true
   }
 })
 
