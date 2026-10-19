@@ -53,13 +53,18 @@
       <span
         v-if="bookmark.check_status === 'ok'"
         class="check-badge ok"
-        title="链接正常（最近检测：{{ formatCheckTime }}）"
+        :title="`链接正常（最近检测：${formatCheckTime}）`"
       >✓</span>
       <span
         v-else-if="bookmark.check_status === 'fail'"
         class="check-badge fail"
-        title="链接失效（最近检测：{{ formatCheckTime }}）"
+        :title="`链接失效（最近检测：${formatCheckTime}）`"
       >✕</span>
+      <span
+        v-else-if="bookmark.check_status === 'unknown'"
+        class="check-badge unknown"
+        :title="`无法确认：检测节点超时或受地区限制，不代表链接失效（最近检测：${formatCheckTime}）`"
+      >?</span>
     </div>
     
     <p class="card-description">
@@ -683,5 +688,9 @@ const handleKeydown = (event) => {
 
 .check-badge.fail {
   background: #ef4444;
+}
+
+.check-badge.unknown {
+  background: #9ca3af;
 }
 </style>

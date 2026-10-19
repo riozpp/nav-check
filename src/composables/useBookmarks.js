@@ -35,9 +35,11 @@ export function useBookmarks() {
       })
     }
     
-    // 仅显示失效书签
+    // 仅显示有问题的书签（失效 + 无法确认）
     if (onlyDeadLinks.value) {
-      result = result.filter(bookmark => bookmark.check_status === 'fail')
+      result = result.filter(bookmark =>
+        bookmark.check_status === 'fail' || bookmark.check_status === 'unknown'
+      )
     }
 
     // 关键词搜索

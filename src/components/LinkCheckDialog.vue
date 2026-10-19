@@ -21,9 +21,10 @@
               </div>
             </div>
             <p class="check-hint">
-              检测会对每个书签的 URL 发起 HEAD 请求（失败时回退 GET）。为避免误杀开启
-              反爬的站点，仅 <strong>404 / 410 与无法连接</strong> 判定为失效，403、429、5xx
-              等一律视为可达。每次最多检测 30 个，多出的会自动分批进行。
+              检测会对每个书签发起 HEAD 请求（失败时回退 GET）。<br>
+              只有 <strong>404 / 410 / 域名解析失败</strong> 才算失效；
+              <strong>超时、5xx、403、429</strong> 等标记为「无法确认」而非失效——
+              因为检测节点在海外，国内站点和被墙站点经常超时，但它们对你访问是正常的。
             </p>
             <div class="dialog-buttons">
               <button class="btn btn-secondary" @click="close">取消</button>
@@ -55,6 +56,7 @@
             <div class="result-summary">
               <span class="summary-ok">✅ 正常：{{ okCount }}</span>
               <span class="summary-fail">❌ 失效：{{ failCount }}</span>
+              <span v-if="unknownCount > 0" class="summary-unknown">⚠️ 无法确认：{{ unknownCount }}</span>
             </div>
 
             <div class="result-filter">
@@ -66,6 +68,10 @@
                 <input v-model="resultFilter" type="radio" value="fail" name="resultFilter">
                 <span>仅失效</span>
               </label>
+              <label v-if="unknownCount > 0" class="radio-label">
+                <input v-model="resultFilter" type="radio" value="unknown" name="resultFilter">
+                <span>仅无法确认</span>
+              </label>
             </div>
 
             <div class="result-list">
@@ -73,10 +79,10 @@
                 v-for="item in filteredResults"
                 :key="item.id"
                 class="result-item"
-                :class="item.ok ? 'ok' : 'fail'"
+                :class="item.verdict || (item.ok ? 'ok' : 'fail')"
               >
                 <span class="result-status">
-                  {{ item.ok ? '✅' : '❌' }}
+                  {{ statusIcon(item) }}
                   <small>{{ item.status ? 'HTTP ' + item.status : (item.error || '失败') }}</small>
                 </span>
                 <div class="result-info">
@@ -85,7 +91,7 @@
                 </div>
                 <div class="result-actions">
                   <button
-                    v-if="!item.ok"
+                    v-if="isFail(item)"
                     class="btn btn-ghost btn-sm"
                     @click="repairLink(item)"
                     :disabled="repairingId === item.id"
@@ -99,7 +105,7 @@
                     title="在 Wayback Machine 中查找存档"
                   >存档</button>
                   <button
-                    v-if="!item.ok"
+                    v-if="isFail(item)"
                     class="btn btn-danger btn-sm"
                     @click="$emit('deleteBookmark', item.id)"
                     title="删除该书签"
@@ -183,12 +189,22 @@ const progressPercent = computed(() =>
   totalCount.value === 0 ? 0 : Math.round((checkedCount.value / totalCount.value) * 100)
 )
 
-const okCount = computed(() => results.value.filter(r => r.ok).length)
-const failCount = computed(() => results.value.filter(r => !r.ok).length)
+const okCount = computed(() => results.value.filter(r => r.verdict === 'ok').length)
+const failCount = computed(() => results.value.filter(r => r.verdict === 'fail').length)
+const unknownCount = computed(() => results.value.filter(r => r.verdict === 'unknown').length)
 
-const filteredResults = computed(() =>
-  resultFilter.value === 'fail' ? results.value.filter(r => !r.ok) : results.value
-)
+const isFail = (item) => (item.verdict || (item.ok ? 'ok' : 'fail')) === 'fail'
+
+const statusIcon = (item) => {
+  const v = item.verdict || (item.ok ? 'ok' : 'fail')
+  return v === 'ok' ? '✅' : v === 'fail' ? '❌' : '⚠️'
+}
+
+const filteredResults = computed(() => {
+  if (resultFilter.value === 'fail') return results.value.filter(r => r.verdict === 'fail')
+  if (resultFilter.value === 'unknown') return results.value.filter(r => r.verdict === 'unknown')
+  return results.value
+})
 
 const getBookmarkName = (id) =>
   props.bookmarkList.find(b => b.id === id)?.name || ''
@@ -464,6 +480,14 @@ defineExpose({ open })
   gap: 0.75rem;
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid var(--border, #f0f0f0);
+}
+
+.summary-unknown {
+  color: #9ca3af;
+}
+
+.result-item.unknown {
+  background: rgba(156, 163, 175, 0.05);
 }
 
 .result-item:last-child {

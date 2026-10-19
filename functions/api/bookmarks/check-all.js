@@ -61,8 +61,8 @@ export async function onRequestPost(context) {
         const result = await checkUrl(row.url)
         checked[index] = {
           id: row.id,
-          ok: result.ok,
-          status: result.status,
+          verdict: result.status,
+          status: result.code,
           check_time: new Date().toISOString()
         }
       }
@@ -79,14 +79,15 @@ export async function onRequestPost(context) {
       ))
     }
 
-    const okCount = checked.filter(r => r.ok).length
+    const okCount = checked.filter(r => r.verdict === 'ok').length
+    const failCount = checked.filter(r => r.verdict === 'fail').length
 
     // 记录上次运行时间与结果，供设置页展示
     const summary = JSON.stringify({
       at: new Date().toISOString(),
       total: checked.length,
       ok: okCount,
-      fail: checked.length - okCount
+      fail: failCount
     })
     await env.DB.prepare(
       `INSERT INTO settings (key, value) VALUES ('linkCheckLastRun', ?)
@@ -97,7 +98,7 @@ export async function onRequestPost(context) {
       success: true,
       total: checked.length,
       ok: okCount,
-      fail: checked.length - okCount,
+      fail: failCount,
       neverChecked: remainRows?.[0]?.cnt ?? 0
     }), {
       status: 200,

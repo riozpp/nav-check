@@ -69,6 +69,15 @@
             >
               仅显示失效（{{ deadCount }}）
             </button>
+            <button
+              v-if="unknownCount > 0"
+              class="tag-filter-btn"
+              :class="{ active: onlyDeadLinks }"
+              @click="toggleDeadFilter"
+              title="超时或受地区限制，不代表链接失效"
+            >
+              无法确认（{{ unknownCount }}）
+            </button>
             <button class="tag-filter-btn clean-btn" @click="openDeadManager">
               批量清理
             </button>
@@ -263,6 +272,11 @@ const clearSearch = () => {
 // 失效书签数量（仅在检测过之后才显示筛选入口）
 const deadCount = computed(() =>
   bookmarks.value.filter(b => b.check_status === 'fail').length
+)
+
+// 无法确认的数量（超时/地区限制），不算失效，单独展示
+const unknownCount = computed(() =>
+  bookmarks.value.filter(b => b.check_status === 'unknown').length
 )
 
 const toggleDeadFilter = () => {

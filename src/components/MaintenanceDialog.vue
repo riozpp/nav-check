@@ -42,6 +42,7 @@
                 <div class="health-card" :class="{ warn: health.dead > 0 }">
                   <div class="health-num">{{ health.dead }}</div>
                   <div class="health-label">失效链接</div>
+                  <div v-if="health.unknown > 0" class="health-sub">另有 {{ health.unknown }} 个无法确认</div>
                   <button class="btn btn-secondary btn-sm" @click="$emit('linkCheck')">
                     去检测
                   </button>
@@ -191,7 +192,7 @@ const progress = ref(0)
 const log = ref('')
 const errorMsg = ref('')
 
-const health = ref({ noIcon: 0, noDesc: 0, noTags: 0, dead: 0, malformed: 0 })
+const health = ref({ noIcon: 0, noDesc: 0, noTags: 0, dead: 0, unknown: 0, malformed: 0 })
 const issues = ref([])
 const replaceForm = ref({ find: '', replace: '' })
 const replaceMatches = ref([])
@@ -236,6 +237,7 @@ const openTab = async (tab) => {
         noDesc: bookmarks.value.filter(b => !b.description).length,
         noTags: bookmarks.value.filter(b => !b.tags || !b.tags.trim()).length,
         dead: bookmarks.value.filter(b => b.check_status === 'fail').length,
+        unknown: bookmarks.value.filter(b => b.check_status === 'unknown').length,
         malformed: issues.value.length
       }
       // 顺便扫描一次畸形 URL，但不阻塞
@@ -517,6 +519,12 @@ defineExpose({ open, close })
 .health-num {
   font-size: 1.5rem;
   font-weight: 700;
+}
+
+.health-sub {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin-bottom: 0.3rem;
 }
 
 .health-label {

@@ -37,8 +37,10 @@ export async function onRequestPost(context) {
         checkResults[index] = {
           id: row.id,
           url: row.url,
-          ok: result.ok,
-          status: result.status,
+          // 只有明确 fail 才算失效，unknown 不算
+          ok: result.status === 'ok',
+          verdict: result.status,
+          status: result.code,
           error: result.error || null,
           check_time: new Date().toISOString()
         };
@@ -54,17 +56,20 @@ export async function onRequestPost(context) {
       await env.DB.batch(checkResults.map(r =>
         env.DB.prepare(
           'UPDATE bookmarks SET check_status = ?, check_code = ?, check_time = ? WHERE id = ?'
-        ).bind(r.ok ? 'ok' : 'fail', r.status, r.check_time, r.id)
+        ).bind(r.verdict, r.status, r.check_time, r.id)
       ));
     }
 
-    const okCount = checkResults.filter(r => r.ok).length;
+    const okCount = checkResults.filter(r => r.verdict === 'ok').length;
+    const failCount = checkResults.filter(r => r.verdict === 'fail').length;
+    const unknownCount = checkResults.filter(r => r.verdict === 'unknown').length;
 
     return new Response(JSON.stringify({
       success: true,
       total: checkResults.length,
       ok: okCount,
-      fail: checkResults.length - okCount,
+      fail: failCount,
+      unknown: unknownCount,
       results: checkResults
     }), {
       status: 200,
