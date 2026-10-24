@@ -64,6 +64,32 @@
       </button>
     </div>
 
+    <!-- AI 智能分类 -->
+    <div class="form-group">
+      <div class="form-header">
+        <div class="form-title">AI 智能分类</div>
+        <div class="form-description">
+          AI 分析全部书签，自动创建分类并把每个书签归入最合适的分类
+        </div>
+      </div>
+      <button class="text-btn" @click="$emit('action', 'smartOrganize')">
+        开始智能分类
+      </button>
+    </div>
+
+    <!-- 清除所有分类 -->
+    <div class="form-group">
+      <div class="form-header">
+        <div class="form-title">清除所有分类</div>
+        <div class="form-description">
+          删除全部分类结构，所有书签保留并移入「未分类」（不可撤销，建议先备份）
+        </div>
+      </div>
+      <button class="text-btn danger" @click="$emit('action', 'clearAllCategories')">
+        清除所有分类
+      </button>
+    </div>
+
     <!-- 定时全量检测 -->
     <div class="form-group">
       <div class="form-header">
@@ -276,6 +302,14 @@ defineExpose({ loadStatus })
   color: var(--text-secondary);
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.text-btn.danger {
+  color: #dc2626;
+}
+
+.text-btn.danger:hover:not(:disabled) {
+  color: #b91c1c;
 }
 
 .action-group {

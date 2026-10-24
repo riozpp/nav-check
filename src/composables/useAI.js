@@ -119,6 +119,25 @@ export function useAI() {
     }
   }
 
+  const smartOrganize = async () => {
+    try {
+      const response = await apiRequest('/api/ai/smart-organize', {
+        method: 'POST',
+        body: JSON.stringify({})
+      })
+      const result = await response.json()
+      if (result.success) {
+        return { success: true, ...result }
+      }
+      return { success: false, error: result.error || '智能分类失败' }
+    } catch (error) {
+      if (error.message === 'Token expired') {
+        return { success: false, error: '登录已过期，请重新登录' }
+      }
+      return { success: false, error: '网络错误' }
+    }
+  }
+
   const saveAISettings = async (settings) => {
     try {
       const response = await apiRequest('/api/ai/settings', {
@@ -207,6 +226,7 @@ export function useAI() {
     suggestCategory,
     batchGenerateDescriptions,
     batchClassify,
+    smartOrganize,
     saveAISettings,
     getAISettings,
     verifyApiKey

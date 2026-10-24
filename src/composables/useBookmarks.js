@@ -395,7 +395,27 @@ export function useBookmarks() {
       return { success: false, error: '网络错误' }
     }
   }
-  
+
+  // 清除所有分类（书签保留，全部挪入「未分类」）
+  const clearAllCategories = async () => {
+    try {
+      const response = await apiRequest('/api/categories/clear-all', {
+        method: 'POST'
+      })
+      const result = await response.json()
+      if (result.success) {
+        await fetchData()
+        return { success: true, bookmarksKept: result.bookmarksKept }
+      }
+      return { success: false, error: result.error || '清除分类失败' }
+    } catch (error) {
+      if (error.message === 'Token expired') {
+        return { success: false, error: '登录已过期，请重新登录' }
+      }
+      return { success: false, error: '网络错误' }
+    }
+  }
+
   return {
     categories,
     bookmarks,
@@ -416,6 +436,7 @@ export function useBookmarks() {
     reorderItems,
     batchOperation,
     getEmptyCategories,
+    clearAllCategories,
     cleanupEmptyCategories
   }
 }

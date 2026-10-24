@@ -244,6 +244,7 @@
     <BatchOperationDialog ref="batchOperationDialog" />
     <BatchAIGenerateDialog ref="batchAIGenerateDialog" @generated="handleAIGenerated" />
     <BatchAIClassifyDialog ref="batchAIClassifyDialog" />
+    <SmartOrganizeDialog ref="smartOrganizeDialog" @completed="fetchData" />
     <BackupDialog ref="backupDialog" />
     <MaintenanceDialog
       ref="maintenanceDialog"
@@ -332,6 +333,7 @@ import ImportExportDialog from './components/ImportExportDialog.vue'
 import BatchOperationDialog from './components/BatchOperationDialog.vue'
 import BatchAIGenerateDialog from './components/BatchAIGenerateDialog.vue'
 import BatchAIClassifyDialog from './components/BatchAIClassifyDialog.vue'
+import SmartOrganizeDialog from './components/SmartOrganizeDialog.vue'
 import BackupDialog from './components/BackupDialog.vue'
 import LinkCheckDialog from './components/LinkCheckDialog.vue'
 import MaintenanceDialog from './components/MaintenanceDialog.vue'
@@ -359,7 +361,8 @@ const {
   reorderItems,
   batchOperation,
   getEmptyCategories,
-  cleanupEmptyCategories
+  cleanupEmptyCategories,
+  clearAllCategories
 } = useBookmarks()
 const { themeMode, themeStyle, isDark, setThemeMode, setThemeStyle, toggleTheme, loadThemeFromDB } = useTheme()
 const { showSearch, hideEmptyCategories, customTitle, footerContent, activeSettingsTab, publicMode, randomWallpaper, wallpaperApi, displayMode, avatarUrl, showTags, toggleSearch, toggleHideEmptyCategories, toggleShowTags, togglePublicMode, updateCustomTitle, updateFooterContent, setActiveSettingsTab, toggleRandomWallpaper, updateWallpaperApi, setDisplayMode, sortMode, setSortMode, updateAvatarUrl, applyWallpaper, loadSettingsFromDB } = useSettings()
@@ -393,6 +396,7 @@ const importExportDialog = ref(null)
 const batchOperationDialog = ref(null)
 const batchAIGenerateDialog = ref(null)
 const batchAIClassifyDialog = ref(null)
+const smartOrganizeDialog = ref(null)
 const backupDialog = ref(null)
 const linkCheckDialog = ref(null)
 const maintenanceDialog = ref(null)
@@ -745,6 +749,16 @@ const handleSettingsAction = (action) => {
     case 'maintenance':
       maintenanceDialog.value.open('health')
       break
+    case 'smartOrganize':
+      if (!aiEnabled.value) {
+        toastError('AI 功能未启用，请先在设置中配置 AI')
+        break
+      }
+      smartOrganizeDialog.value?.open()
+      break
+    case 'clearAllCategories':
+      handleClearAllCategories()
+      break
     case 'replaceUrl':
       maintenanceDialog.value.open('replace')
       break
@@ -854,6 +868,23 @@ const handleCleanupEmptyCategories = async () => {
     }
   } else {
     toastError(cleanupResult.error || '清理空分类失败')
+  }
+}
+
+// 清除所有分类（书签全部保留，移入「未分类」）
+const handleClearAllCategories = async () => {
+  const total = bookmarks.value.length
+  const confirmed = await confirmDialog.value.open(
+    `确定要清除所有分类吗？\n\n所有分类将被删除，${total} 个书签会全部保留并移入「未分类」。\n\n此操作不可恢复，建议先备份数据！`,
+    '清除所有分类'
+  )
+  if (!confirmed) return
+
+  const result = await clearAllCategories()
+  if (result.success) {
+    toastSuccess(`已清除全部分类，${result.bookmarksKept} 个书签已移入「未分类」`)
+  } else {
+    toastError(result.error || '清除分类失败')
   }
 }
 
