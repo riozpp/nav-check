@@ -74,6 +74,15 @@ export async function onRequest(context) {
     return await next();
   }
 
+  // Token 续期接口自行校验旧 token，不走常规校验（否则过期 token 会被拦）
+  if (url.pathname === '/api/refresh') {
+    const response = await next();
+    Object.entries(securityHeaders).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+    return response;
+  }
+
   // 书签点击计数：公开动作，任何访客都可上报
   if (POST_CLICK_PATTERN.test(url.pathname) && request.method === 'POST') {
     return await next();

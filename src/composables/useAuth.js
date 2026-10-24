@@ -51,33 +51,62 @@ export function useAuth() {
   }
   
   // 全局 API 请求处理函数
-  const apiRequest = async (url, options = {}) => {
-    const defaultOptions = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders()
-      }
+  // 401 时自动尝试 token 续期一次并重试，避免长耗时操作中途登录过期
+  let refreshingPromise = null
+
+  const refreshToken = async () => {
+    if (!token.value) return false
+    // 并发请求共享同一个刷新过程，避免重复刷新
+    if (!refreshingPromise) {
+      refreshingPromise = (async () => {
+        try {
+          const response = await fetch('/api/refresh', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token.value}` }
+          })
+          if (!response.ok) return false
+          const data = await response.json()
+          if (data.success && data.token) {
+            token.value = data.token
+            localStorage.setItem('authToken', data.token)
+            return true
+          }
+          return false
+        } catch {
+          return false
+        } finally {
+          setTimeout(() => { refreshingPromise = null }, 200)
+        }
+      })()
     }
-    
-    const mergedOptions = {
-      ...defaultOptions,
+    return refreshingPromise
+  }
+
+  const apiRequest = async (url, options = {}) => {
+    const buildOptions = () => ({
       ...options,
       headers: {
-        ...defaultOptions.headers,
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
         ...options.headers
       }
-    }
-    
+    })
+
     try {
-      const response = await fetch(url, mergedOptions)
-      
-      // 检查 401 错误
+      let response = await fetch(url, buildOptions())
+
+      // Token 过期：先尝试续期，成功则重试一次原请求
       if (response.status === 401) {
-        // Token 过期，自动登出
-        logout()
-        throw new Error('Token expired')
+        const refreshed = await refreshToken()
+        if (refreshed) {
+          response = await fetch(url, buildOptions())
+        }
+        if (response.status === 401) {
+          logout()
+          throw new Error('Token expired')
+        }
       }
-      
+
       return response
     } catch (error) {
       if (error.message === 'Token expired') {
@@ -100,6 +129,7 @@ export function useAuth() {
     isAuthenticated,
     login,
     logout,
+    refreshToken,
     getAuthHeaders,
     onAuthChange,
     apiRequest

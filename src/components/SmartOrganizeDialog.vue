@@ -94,12 +94,14 @@ import { ref, computed } from 'vue'
 import { useAI } from '../composables/useAI'
 import { useBookmarks } from '../composables/useBookmarks'
 import { useToast } from '../composables/useToast'
+import { useAuth } from '../composables/useAuth'
 import { buildCategoryTree, getCategoryPath } from '../utils/categoryTree'
 
 const emit = defineEmits(['completed'])
 
 const { smartOrganizeChunk, smartOrganizeApply } = useAI()
 const { bookmarks, categories } = useBookmarks()
+const { refreshToken, isAuthenticated } = useAuth()
 const { success: toastSuccess, error: toastError } = useToast()
 
 const CHUNK_SIZE = 40
@@ -152,6 +154,9 @@ const start = async () => {
   running.value = true
 
   try {
+    // 开跑前先续期 token，拿到全新的有效期窗口
+    if (isAuthenticated.value) await refreshToken()
+
     const list = bookmarks.value.map(b => ({
       id: b.id,
       name: b.name,
@@ -165,13 +170,30 @@ const start = async () => {
     // 逐块分析，汇总 分配结果
     const assign = {}
     let failedCount = 0
+    let lastChunkError = ''
 
     for (let i = 0; i < list.length; i += CHUNK_SIZE) {
       const chunk = list.slice(i, i + CHUNK_SIZE)
       let res = await smartOrganizeChunk(chunk, existingPaths)
 
-      // 单批失败自动重试一次
+      // 登录过期：自动续期后重试一次；仍失败则整体中止
+      if (!res.success && res.error && res.error.includes('登录已过期')) {
+        const refreshed = await refreshToken()
+        if (refreshed) {
+          res = await smartOrganizeChunk(chunk, existingPaths)
+        }
+        if (!res.success) {
+          running.value = false
+          done.value = true
+          errorMsg.value = '登录已过期且自动续期失败，请重新登录后再试（前面批次未写入，数据不受影响）'
+          toastError(errorMsg.value)
+          return
+        }
+      }
+
+      // 其他错误：自动重试一次
       if (!res.success) {
+        lastChunkError = res.error
         await new Promise(resolve => setTimeout(resolve, 1500))
         res = await smartOrganizeChunk(chunk, existingPaths)
       }
@@ -208,7 +230,11 @@ const start = async () => {
         total: list.length,
         failed: failedCount + (list.length - Object.keys(assign).length)
       }
-      toastSuccess(`智能分类完成：归类 ${applyRes.assigned} 个书签，新建 ${applyRes.categoriesCreated} 个分类`)
+      if (failedCount > 0) {
+        toastSuccess(`智能分类基本完成：归类 ${applyRes.assigned} 个，${failedCount} 个未分上（${lastChunkError || '批次失败'}）`)
+      } else {
+        toastSuccess(`智能分类完成：归类 ${applyRes.assigned} 个书签，新建 ${applyRes.categoriesCreated} 个分类`)
+      }
       emit('completed')
     } else {
       errorMsg.value = applyRes.error || '写入失败'
