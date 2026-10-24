@@ -75,7 +75,7 @@ export async function onRequestPost(context) {
       await env.DB.batch(checked.map(r =>
         env.DB.prepare(
           'UPDATE bookmarks SET check_status = ?, check_code = ?, check_time = ? WHERE id = ?'
-        ).bind(r.ok ? 'ok' : 'fail', r.status, r.check_time, r.id)
+        ).bind(r.verdict, r.status, r.check_time, r.id)
       ))
     }
 
