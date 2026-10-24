@@ -32,7 +32,11 @@
             <div v-if="running" class="running-section">
               <div class="spinner"></div>
               <p class="running-text">{{ stageText }}</p>
-              <p class="running-hint">书签越多耗时越久，请不要关闭页面</p>
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
+              </div>
+              <p class="progress-text">{{ progressPercentage }}%（{{ doneChunks }} / {{ totalChunks }} 批）</p>
+              <p class="running-hint">每批约需 10~30 秒，请不要关闭页面</p>
             </div>
 
             <div v-if="done" class="done-section">
@@ -51,6 +55,7 @@
                 <p class="done-summary">
                   已归类 <strong>{{ result.assigned }}</strong> / {{ result.total }} 个书签，
                   新建 <strong>{{ result.categoriesCreated }}</strong> 个分类
+                  <span v-if="result.failed > 0" class="fail-note">（{{ result.failed }} 个未能分类）</span>
                 </p>
                 <div v-if="result.categorySummary?.length" class="summary-list">
                   <div v-for="c in result.categorySummary" :key="c.name" class="summary-item">
@@ -89,12 +94,15 @@ import { ref, computed } from 'vue'
 import { useAI } from '../composables/useAI'
 import { useBookmarks } from '../composables/useBookmarks'
 import { useToast } from '../composables/useToast'
+import { buildCategoryTree, getCategoryPath } from '../utils/categoryTree'
 
 const emit = defineEmits(['completed'])
 
-const { smartOrganize } = useAI()
-const { bookmarks } = useBookmarks()
-const { success: toastSuccess } = useToast()
+const { smartOrganizeChunk, smartOrganizeApply } = useAI()
+const { bookmarks, categories } = useBookmarks()
+const { success: toastSuccess, error: toastError } = useToast()
+
+const CHUNK_SIZE = 40
 
 const show = ref(false)
 const running = ref(false)
@@ -102,16 +110,19 @@ const done = ref(false)
 const result = ref(null)
 const errorMsg = ref('')
 
-const bookmarkTotal = computed(() => bookmarks.value.length)
+const doneChunks = ref(0)
+const totalChunks = ref(0)
 
-const stageTexts = [
-  '正在读取书签…',
-  'AI 正在分析书签内容…',
-  '正在设计分类结构…',
-  '正在归类书签…'
-]
-const stageIndex = ref(0)
-const stageText = computed(() => stageTexts[Math.min(stageIndex.value, stageTexts.length - 1)])
+const bookmarkTotal = computed(() => bookmarks.value.length)
+const progressPercentage = computed(() => {
+  if (totalChunks.value === 0) return 0
+  return Math.round((doneChunks.value / totalChunks.value) * 100)
+})
+
+const stageText = computed(() => {
+  if (doneChunks.value >= totalChunks.value && totalChunks.value > 0) return '正在创建分类并写入结果…'
+  return 'AI 正在分析书签并设计分类…'
+})
 
 const open = () => {
   show.value = true
@@ -119,7 +130,8 @@ const open = () => {
   done.value = false
   result.value = null
   errorMsg.value = ''
-  stageIndex.value = 0
+  doneChunks.value = 0
+  totalChunks.value = 0
 }
 
 const close = () => {
@@ -127,30 +139,86 @@ const close = () => {
   show.value = false
 }
 
+// 现有分类的完整路径，供 AI 复用
+const prepareExistingCategories = () => {
+  if (!categories.value.length) return []
+  const { flatList, map } = buildCategoryTree(categories.value)
+  return flatList
+    .filter(c => c.name !== '未分类')
+    .map(cat => getCategoryPath(cat.id, map).map(c => c.name).join(' / '))
+}
+
 const start = async () => {
   running.value = true
-  // 轮播提示语，让等待过程不那么枯燥
-  const timer = setInterval(() => {
-    if (stageIndex.value < stageTexts.length - 1) stageIndex.value++
-  }, 8000)
 
   try {
-    const res = await smartOrganize()
-    clearInterval(timer)
+    const list = bookmarks.value.map(b => ({
+      id: b.id,
+      name: b.name,
+      url: b.url,
+      description: b.description || ''
+    }))
+    const existingPaths = prepareExistingCategories()
+    totalChunks.value = Math.ceil(list.length / CHUNK_SIZE)
+    doneChunks.value = 0
+
+    // 逐块分析，汇总 分配结果
+    const assign = {}
+    let failedCount = 0
+
+    for (let i = 0; i < list.length; i += CHUNK_SIZE) {
+      const chunk = list.slice(i, i + CHUNK_SIZE)
+      let res = await smartOrganizeChunk(chunk, existingPaths)
+
+      // 单批失败自动重试一次
+      if (!res.success) {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        res = await smartOrganizeChunk(chunk, existingPaths)
+      }
+
+      if (res.success) {
+        Object.assign(assign, res.assign)
+      } else {
+        failedCount += chunk.length
+        console.warn('智能分类批次失败:', res.error)
+      }
+
+      doneChunks.value++
+      // 批次间稍作停顿，避免触发 API 速率限制
+      if (i + CHUNK_SIZE < list.length) {
+        await new Promise(resolve => setTimeout(resolve, 400))
+      }
+    }
+
+    if (Object.keys(assign).length === 0) {
+      running.value = false
+      done.value = true
+      errorMsg.value = 'AI 未能生成分类方案，请检查 AI 配置后重试'
+      return
+    }
+
+    // 应用：创建分类 + 写回书签
+    const applyRes = await smartOrganizeApply(assign)
     running.value = false
     done.value = true
-    if (res.success) {
-      result.value = res
-      toastSuccess(`智能分类完成：归类 ${res.assigned} 个书签，新建 ${res.categoriesCreated} 个分类`)
+
+    if (applyRes.success) {
+      result.value = {
+        ...applyRes,
+        total: list.length,
+        failed: failedCount + (list.length - Object.keys(assign).length)
+      }
+      toastSuccess(`智能分类完成：归类 ${applyRes.assigned} 个书签，新建 ${applyRes.categoriesCreated} 个分类`)
       emit('completed')
     } else {
-      errorMsg.value = res.error || '未知错误'
+      errorMsg.value = applyRes.error || '写入失败'
+      toastError(errorMsg.value)
     }
   } catch (e) {
-    clearInterval(timer)
     running.value = false
     done.value = true
     errorMsg.value = e.message || '网络错误'
+    toastError(errorMsg.value)
   }
 }
 
@@ -285,6 +353,32 @@ defineExpose({ open, close })
   font-size: 0.8125rem;
   color: var(--text-secondary);
   margin: 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 10px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.progress-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0;
+}
+
+.fail-note {
+  color: #d97706;
 }
 
 .done-section {

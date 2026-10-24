@@ -119,17 +119,38 @@ export function useAI() {
     }
   }
 
-  const smartOrganize = async () => {
+  // 智能分类·分块分析：每次处理一批书签，避免单请求超时
+  const smartOrganizeChunk = async (chunkBookmarks, existingCategories) => {
     try {
-      const response = await apiRequest('/api/ai/smart-organize', {
+      const response = await apiRequest('/api/ai/smart-organize/chunk', {
         method: 'POST',
-        body: JSON.stringify({})
+        body: JSON.stringify({ bookmarks: chunkBookmarks, existingCategories })
+      })
+      const result = await response.json()
+      if (result.success) {
+        return { success: true, categories: result.categories || [], assign: result.assign || {} }
+      }
+      return { success: false, error: result.error || '分析失败' }
+    } catch (error) {
+      if (error.message === 'Token expired') {
+        return { success: false, error: '登录已过期，请重新登录' }
+      }
+      return { success: false, error: '网络错误' }
+    }
+  }
+
+  // 智能分类·应用结果：创建分类并写回书签
+  const smartOrganizeApply = async (assign) => {
+    try {
+      const response = await apiRequest('/api/ai/smart-organize/apply', {
+        method: 'POST',
+        body: JSON.stringify({ assign })
       })
       const result = await response.json()
       if (result.success) {
         return { success: true, ...result }
       }
-      return { success: false, error: result.error || '智能分类失败' }
+      return { success: false, error: result.error || '写入失败' }
     } catch (error) {
       if (error.message === 'Token expired') {
         return { success: false, error: '登录已过期，请重新登录' }
@@ -226,7 +247,8 @@ export function useAI() {
     suggestCategory,
     batchGenerateDescriptions,
     batchClassify,
-    smartOrganize,
+    smartOrganizeChunk,
+    smartOrganizeApply,
     saveAISettings,
     getAISettings,
     verifyApiKey
