@@ -112,7 +112,7 @@ const { bookmarks, categories } = useBookmarks()
 const { refreshToken, isAuthenticated } = useAuth()
 const { success: toastSuccess, error: toastError } = useToast()
 
-const CHUNK_SIZE = 24
+const CHUNK_SIZE = 16
 
 const show = ref(false)
 const running = ref(false)
@@ -263,10 +263,11 @@ const start = async () => {
     done.value = true
 
     if (applyRes.success) {
+      // 失败数 = 总数 - 实际写入数（不要重复计算）
       result.value = {
         ...applyRes,
         total: list.length,
-        failed: failedCount + (list.length - Object.keys(assign).length)
+        failed: Math.max(0, list.length - applyRes.assigned)
       }
       failedChunkErrors.value = failedChunkErrorsLocal
       if (failedCount > 0) {

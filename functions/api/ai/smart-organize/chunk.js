@@ -63,8 +63,10 @@ Respond with ONLY a JSON object in this exact format:
           { role: 'system', content: 'You output only valid JSON. No markdown, no explanation.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.2,
-        max_tokens: 2000
+            temperature: 0.2,
+            // 推理模型（如 deepseek-flash/reasoner）会先消耗大量 token 思考，
+            // 配额太小会导致答案被截断甚至为空，必须给足
+            max_tokens: 8000
       }
     })
 
