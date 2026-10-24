@@ -91,6 +91,17 @@
       <button
         type="button"
         class="icon-btn-small"
+        title="移到最上"
+        @click.stop="$emit('reorder-category', { id: category.id, direction: 'top' })"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <polyline points="18 15 12 9 6 15" />
+          <polyline points="18 9 12 3 6 9" transform="translate(0,2)" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="icon-btn-small"
         title="上移"
         @click.stop="$emit('reorder-category', { id: category.id, direction: 'up' })"
       >
@@ -106,6 +117,17 @@
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="icon-btn-small"
+        title="移到最下"
+        @click.stop="$emit('reorder-category', { id: category.id, direction: 'bottom' })"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <polyline points="6 9 12 15 18 9" />
+          <polyline points="6 15 12 21 18 15" transform="translate(0,-2)" />
         </svg>
       </button>
       <button
@@ -219,7 +241,8 @@ const props = defineProps({
   }
 })
 
-const isExpanded = ref(false)
+// 默认展开所有层级，用户可手动收起
+const isExpanded = ref(true)
 
 const isCategorySelected = computed(() => props.selectedCategoryIds?.includes(props.category.id) ?? false)
 

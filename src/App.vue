@@ -1236,6 +1236,12 @@ const handleReorderCategory = async ({ id, direction }) => {
   } else if (direction === 'down' && index < siblings.length - 1) {
     const [curr] = siblings.splice(index, 1)
     siblings.splice(index + 1, 0, curr)
+  } else if (direction === 'top' && index > 0) {
+    const [curr] = siblings.splice(index, 1)
+    siblings.unshift(curr)
+  } else if (direction === 'bottom' && index < siblings.length - 1) {
+    const [curr] = siblings.splice(index, 1)
+    siblings.push(curr)
   } else {
     return
   }
