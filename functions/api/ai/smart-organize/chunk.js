@@ -12,14 +12,15 @@ function extractJson(text) {
 }
 
 // POST /api/ai/smart-organize/chunk
-// 处理一批书签（约 40 个），单次请求很快返回，避免边缘网络 100s 超时
-// 请求体：{ bookmarks: [{id,name,url,description}], existingCategories: ["路径", ...] }
+// 处理一批书签（约 24 个），单次请求很快返回，避免边缘网络 100s 超时
+// 请求体：{ bookmarks: [{id,name,url,description}], existingCategories: ["路径",...], knownCategories: ["分类名",...] }
+// knownCategories 是前面批次已经产生/已存在的分类名，要求 AI 优先原样复用，避免每批各建一套造成重复
 // 返回：{ success, categories: ["新分类名"...], assign: { "<书签id>": "分类名" } }
 export async function onRequestPost(context) {
   const { request, env } = context
 
   try {
-    const { bookmarks, existingCategories } = await request.json()
+    const { bookmarks, existingCategories, knownCategories } = await request.json()
 
     if (!Array.isArray(bookmarks) || bookmarks.length === 0) {
       return new Response(JSON.stringify({ success: false, error: 'Missing bookmarks' }), {
@@ -34,16 +35,20 @@ export async function onRequestPost(context) {
       .map(b => `${b.id}. ${b.name} | ${b.url}${b.description ? ' | ' + String(b.description).slice(0, 80) : ''}`)
       .join('\n')
 
+    const knownList = Array.isArray(knownCategories) ? knownCategories.filter(n => typeof n === 'string' && n.trim()) : []
+    const knownText = knownList.length
+      ? `\nCategory names already in use (MUST reuse one of these EXACT names whenever suitable; only create a genuinely new category when none fits; avoid near-synonyms of existing names):\n${knownList.join('、')}\n`
+      : ''
     const existingText = Array.isArray(existingCategories) && existingCategories.length
-      ? `\nExisting categories (reuse these when suitable):\n${existingCategories.join('\n')}\n`
+      ? `\nExisting categories (full paths, reuse when suitable):\n${existingCategories.join('\n')}\n`
       : ''
 
     const prompt = `You are organizing website bookmarks. Below is a list of bookmarks (format: id. name | url | description).
 
 ${listText}
-${existingText}
+${existingText}${knownText}
 Task:
-1. Design a concise set of top-level categories for ALL these bookmarks. Use short names (2-6 Chinese characters) in the same language as the bookmarks. Usually 5-12 categories is enough. Reuse existing categories where suitable, create new ones only when needed. Do NOT use "未分类" as a category.
+1. The final set of categories across ALL batches should be concise (ideally 8-15 total). Use short names (2-6 Chinese characters) in the same language as the bookmarks. Reuse existing/known category names as much as possible. Do NOT use "未分类" as a category.
 2. Assign EVERY bookmark id (the number before the dot) to exactly one category name.
 
 Respond with ONLY a JSON object in this exact format:

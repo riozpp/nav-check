@@ -120,11 +120,11 @@ export function useAI() {
   }
 
   // 智能分类·分块分析：每次处理一批书签，避免单请求超时
-  const smartOrganizeChunk = async (chunkBookmarks, existingCategories) => {
+  const smartOrganizeChunk = async (chunkBookmarks, existingCategories, knownCategories) => {
     try {
       const response = await apiRequest('/api/ai/smart-organize/chunk', {
         method: 'POST',
-        body: JSON.stringify({ bookmarks: chunkBookmarks, existingCategories })
+        body: JSON.stringify({ bookmarks: chunkBookmarks, existingCategories, knownCategories })
       })
       let result
       try {

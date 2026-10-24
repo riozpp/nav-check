@@ -24,9 +24,13 @@
               </p>
               <ul class="tips">
                 <li>已有分类会被尽量复用，缺少的会自动新建</li>
-                <li>书签较多时耗时较长（约每 40 个书签 10~20 秒），请耐心等待</li>
+                <li>书签较多时耗时较长，请耐心等待</li>
                 <li>操作不可撤销，建议先在「数据管理」中备份</li>
               </ul>
+              <label v-if="uncategorizedCount > 0" class="checkbox-row">
+                <input type="checkbox" v-model="onlyUncategorized" />
+                <span>只分类「未分类」里的 {{ uncategorizedCount }} 个书签（不动已分好的）</span>
+              </label>
             </div>
 
             <div v-if="running" class="running-section">
@@ -115,6 +119,7 @@ const running = ref(false)
 const done = ref(false)
 const result = ref(null)
 const errorMsg = ref('')
+const onlyUncategorized = ref(false)
 
 const doneChunks = ref(0)
 const totalChunks = ref(0)
@@ -122,6 +127,13 @@ const lastError = ref('')
 const failedChunkErrors = ref([])
 
 const bookmarkTotal = computed(() => bookmarks.value.length)
+
+// 「未分类」（顶级）里的书签数量
+const uncategorizedCount = computed(() => {
+  const unc = categories.value.find(c => c.depth === 0 && c.name === '未分类')
+  if (!unc) return 0
+  return bookmarks.value.filter(b => b.category_id === unc.id).length
+})
 const progressPercentage = computed(() => {
   if (totalChunks.value === 0) return 0
   return Math.round((doneChunks.value / totalChunks.value) * 100)
@@ -142,6 +154,7 @@ const open = () => {
   totalChunks.value = 0
   lastError.value = ''
   failedChunkErrors.value = []
+  onlyUncategorized.value = uncategorizedCount.value > 0 && uncategorizedCount.value === bookmarkTotal.value
 }
 
 const close = () => {
@@ -165,17 +178,28 @@ const start = async () => {
     // 开跑前先续期 token，拿到全新的有效期窗口
     if (isAuthenticated.value) await refreshToken()
 
-    const list = bookmarks.value.map(b => ({
+    // 目标书签：全部，或仅「未分类」里的
+    let list = bookmarks.value
+    if (onlyUncategorized.value) {
+      const unc = categories.value.find(c => c.depth === 0 && c.name === '未分类')
+      if (unc) list = list.filter(b => b.category_id === unc.id)
+    }
+    list = list.map(b => ({
       id: b.id,
       name: b.name,
       url: b.url,
       description: b.description || ''
     }))
     const existingPaths = prepareExistingCategories()
+
+    // 已用分类名集合：现有顶级分类名 + 各批次产生的名字，逐批传给 AI 强制复用
+    const knownNames = new Set(
+      categories.value.filter(c => c.depth === 0 && c.name !== '未分类').map(c => c.name)
+    )
+
     totalChunks.value = Math.ceil(list.length / CHUNK_SIZE)
     doneChunks.value = 0
 
-    // 逐块分析，汇总 分配结果
     const assign = {}
     let failedCount = 0
     let lastChunkError = ''
@@ -183,38 +207,40 @@ const start = async () => {
 
     for (let i = 0; i < list.length; i += CHUNK_SIZE) {
       const chunk = list.slice(i, i + CHUNK_SIZE)
-      let res = await smartOrganizeChunk(chunk, existingPaths)
+      const chunkIndex = Math.floor(i / CHUNK_SIZE) + 1
 
-      // 登录过期：自动续期后重试一次；仍失败则整体中止
-      if (!res.success && res.error && res.error.includes('登录已过期')) {
-        const refreshed = await refreshToken()
-        if (refreshed) {
-          res = await smartOrganizeChunk(chunk, existingPaths)
+      let res = null
+      // 最多尝试 3 次，指数退避
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        res = await smartOrganizeChunk(chunk, existingPaths, [...knownNames])
+
+        if (res.success) break
+
+        // 登录过期：续期后重试
+        if (res.error && res.error.includes('登录已过期')) {
+          const refreshed = await refreshToken()
+          if (refreshed) {
+            res = await smartOrganizeChunk(chunk, existingPaths, [...knownNames])
+          }
         }
-        if (!res.success) {
-          running.value = false
-          done.value = true
-          errorMsg.value = '登录已过期且自动续期失败，请重新登录后再试（前面批次未写入，数据不受影响）'
-          toastError(errorMsg.value)
-          return
+
+        if (res.success) break
+        if (attempt < 3) {
+          lastError.value = `第 ${chunkIndex} 批第 ${attempt} 次失败：${res.error}，重试中…`
+          await new Promise(resolve => setTimeout(resolve, attempt * 2500))
         }
       }
 
-      // 其他错误：记录原因，自动重试一次
-      if (!res.success) {
-        lastChunkError = res.error
-        lastError.value = `第 ${Math.floor(i / CHUNK_SIZE) + 1} 批：${res.error}`
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        res = await smartOrganizeChunk(chunk, existingPaths)
-      }
-
-      if (res.success) {
+      if (res && res.success) {
         Object.assign(assign, res.assign)
+        ;(res.categories || []).forEach(n => knownNames.add(n))
+        lastError.value = ''
       } else {
         failedCount += chunk.length
-        const msg = `第 ${Math.floor(i / CHUNK_SIZE) + 1} 批：${res.error}`
+        const msg = `第 ${chunkIndex} 批：${(res && res.error) || '未知错误'}`
         failedChunkErrorsLocal.push(msg)
-        console.warn('智能分类批次失败:', res.error)
+        lastError.value = msg
+        console.warn('智能分类批次失败:', msg)
       }
 
       doneChunks.value++
@@ -244,7 +270,7 @@ const start = async () => {
       }
       failedChunkErrors.value = failedChunkErrorsLocal
       if (failedCount > 0) {
-        toastSuccess(`智能分类基本完成：归类 ${applyRes.assigned} 个，${failedCount} 个未分上（${lastChunkError || '批次失败'}）`)
+        toastSuccess(`智能分类基本完成：归类 ${applyRes.assigned} 个，${failedCount} 个未分上`)
       } else {
         toastSuccess(`智能分类完成：归类 ${applyRes.assigned} 个书签，新建 ${applyRes.categoriesCreated} 个分类`)
       }
@@ -359,6 +385,23 @@ defineExpose({ open, close })
   color: var(--text-secondary);
   font-size: 0.875rem;
   line-height: 1.8;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.875rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--primary);
 }
 
 .running-section {
