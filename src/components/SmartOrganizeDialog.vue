@@ -58,6 +58,9 @@
                   新建 <strong>{{ result.categoriesCreated }}</strong> 个分类
                   <span v-if="result.failed > 0" class="fail-note">（{{ result.failed }} 个未能分类）</span>
                 </p>
+                <div v-if="failedChunkErrors.length" class="error-list">
+                  <div v-for="(e, idx) in failedChunkErrors" :key="idx" class="error-item">{{ e }}</div>
+                </div>
                 <div v-if="result.categorySummary?.length" class="summary-list">
                   <div v-for="c in result.categorySummary" :key="c.name" class="summary-item">
                     <span>{{ c.name }}</span>
@@ -116,6 +119,7 @@ const errorMsg = ref('')
 const doneChunks = ref(0)
 const totalChunks = ref(0)
 const lastError = ref('')
+const failedChunkErrors = ref([])
 
 const bookmarkTotal = computed(() => bookmarks.value.length)
 const progressPercentage = computed(() => {
@@ -137,6 +141,7 @@ const open = () => {
   doneChunks.value = 0
   totalChunks.value = 0
   lastError.value = ''
+  failedChunkErrors.value = []
 }
 
 const close = () => {
@@ -174,6 +179,7 @@ const start = async () => {
     const assign = {}
     let failedCount = 0
     let lastChunkError = ''
+    const failedChunkErrorsLocal = []
 
     for (let i = 0; i < list.length; i += CHUNK_SIZE) {
       const chunk = list.slice(i, i + CHUNK_SIZE)
@@ -206,6 +212,8 @@ const start = async () => {
         Object.assign(assign, res.assign)
       } else {
         failedCount += chunk.length
+        const msg = `第 ${Math.floor(i / CHUNK_SIZE) + 1} 批：${res.error}`
+        failedChunkErrorsLocal.push(msg)
         console.warn('智能分类批次失败:', res.error)
       }
 
@@ -234,6 +242,7 @@ const start = async () => {
         total: list.length,
         failed: failedCount + (list.length - Object.keys(assign).length)
       }
+      failedChunkErrors.value = failedChunkErrorsLocal
       if (failedCount > 0) {
         toastSuccess(`智能分类基本完成：归类 ${applyRes.assigned} 个，${failedCount} 个未分上（${lastChunkError || '批次失败'}）`)
       } else {
@@ -418,6 +427,26 @@ defineExpose({ open, close })
 
 .fail-note {
   color: #d97706;
+}
+
+.error-list {
+  width: 100%;
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.error-item {
+  font-size: 0.8125rem;
+  color: #d97706;
+  text-align: left;
+  padding: 0.375rem 0.75rem;
+  background: rgba(217, 119, 6, 0.08);
+  border-radius: var(--radius-sm);
+  word-break: break-all;
 }
 
 .done-section {

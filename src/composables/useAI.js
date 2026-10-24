@@ -126,16 +126,22 @@ export function useAI() {
         method: 'POST',
         body: JSON.stringify({ bookmarks: chunkBookmarks, existingCategories })
       })
-      const result = await response.json()
+      let result
+      try {
+        result = await response.json()
+      } catch {
+        // 响应不是 JSON（如 524 超时页），带上状态码方便定位
+        return { success: false, error: `服务端返回 ${response.status}（可能超时）` }
+      }
       if (result.success) {
         return { success: true, categories: result.categories || [], assign: result.assign || {} }
       }
-      return { success: false, error: result.error || '分析失败' }
+      return { success: false, error: result.error || `失败(${response.status})` }
     } catch (error) {
       if (error.message === 'Token expired') {
         return { success: false, error: '登录已过期，请重新登录' }
       }
-      return { success: false, error: '网络错误' }
+      return { success: false, error: error.message || '网络错误' }
     }
   }
 
@@ -146,7 +152,12 @@ export function useAI() {
         method: 'POST',
         body: JSON.stringify({ assign })
       })
-      const result = await response.json()
+      let result
+      try {
+        result = await response.json()
+      } catch {
+        return { success: false, error: `服务端返回 ${response.status}（可能超时）` }
+      }
       if (result.success) {
         return { success: true, ...result }
       }
