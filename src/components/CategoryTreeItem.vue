@@ -8,7 +8,21 @@
       'is-root': level === 0
     }"
   >
-    <div class="category-main" :style="{ marginLeft: `${level * 1.1}rem` }">
+    <div
+      class="category-main"
+      :class="{
+        'drag-over-above': isDragOver && dropPosition === 'before',
+        'drag-over-below': isDragOver && dropPosition === 'after',
+        dragging: isDragging
+      }"
+      :style="{ marginLeft: `${level * 1.1}rem` }"
+      :draggable="isEditMode && !isBatchMode"
+      @dragstart="handleDragStart"
+      @dragend="handleDragEnd"
+      @dragover.prevent="handleDragOver"
+      @dragleave="handleDragLeave"
+      @drop.prevent="handleDrop"
+    >
       <button
         v-if="category.children?.length > 0"
         type="button"
@@ -163,6 +177,7 @@
         @edit-category="$emit('edit-category', $event)"
         @delete-category="$emit('delete-category', $event)"
         @reorder-category="$emit('reorder-category', $event)"
+        @category-drag-reorder="$emit('category-drag-reorder', $event)"
       />
     </ul>
   </li>
@@ -211,6 +226,64 @@ const isCategorySelected = computed(() => props.selectedCategoryIds?.includes(pr
 const toggleExpanded = () => {
   isExpanded.value = !isExpanded.value
 }
+
+// ===== 拖拽排序（仅编辑模式，同级分类之间） =====
+const isDragging = ref(false)
+const isDragOver = ref(false)
+const dropPosition = ref('after')
+
+const handleDragStart = (e) => {
+  if (!props.isEditMode || props.isBatchMode) return
+  isDragging.value = true
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/category-id', String(props.category.id))
+  e.dataTransfer.setData('text/category-parent', String(props.category.parent_id ?? ''))
+}
+
+const handleDragEnd = () => {
+  isDragging.value = false
+  isDragOver.value = false
+}
+
+const handleDragOver = (e) => {
+  if (!props.isEditMode || props.isBatchMode) return
+  const draggedId = e.dataTransfer.types.includes('text/category-id')
+  if (!draggedId) return
+  const rect = e.currentTarget.getBoundingClientRect()
+  // 鼠标在上半部分 → 插到前面，下半部分 → 插到后面
+  dropPosition.value = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+  isDragOver.value = true
+}
+
+const handleDragLeave = () => {
+  isDragOver.value = false
+}
+
+const handleDrop = (e) => {
+  isDragOver.value = false
+  if (!props.isEditMode || props.isBatchMode) return
+  const draggedId = Number.parseInt(e.dataTransfer.getData('text/category-id'), 10)
+  const draggedParent = e.dataTransfer.getData('text/category-parent')
+  if (!Number.isInteger(draggedId) || draggedId === props.category.id) return
+  // 只允许同级（同一父分类下）排序
+  if (draggedParent !== String(props.category.parent_id ?? '')) return
+  emit('category-drag-reorder', {
+    draggedId,
+    targetId: props.category.id,
+    position: dropPosition.value
+  })
+}
+
+const emit = defineEmits([
+  'select',
+  'toggle-category-selection',
+  'add-subcategory',
+  'add-bookmark',
+  'edit-category',
+  'delete-category',
+  'reorder-category',
+  'category-drag-reorder'
+])
 </script>
 
 <style scoped>
@@ -227,6 +300,33 @@ const toggleExpanded = () => {
   padding: 0.35rem 0.5rem;
   border-radius: var(--radius-sm);
   transition: background-color 0.2s ease;
+  position: relative;
+}
+
+/* 拖拽排序指示线 */
+.category-main.drag-over-above::before,
+.category-main.drag-over-below::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 2px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.category-main.drag-over-above::before {
+  top: -2px;
+}
+
+.category-main.drag-over-below::after {
+  bottom: -2px;
+}
+
+.category-main.dragging {
+  opacity: 0.4;
 }
 
 .category-item:not(.is-root) .category-main {

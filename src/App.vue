@@ -146,6 +146,7 @@
            @edit-category="handleEditCategory"
            @delete-category="handleDeleteCategory"
            @reorder-category="handleReorderCategory"
+           @category-drag-reorder="handleCategoryDragReorder"
          />
         
         <!-- Bookmarks Content -->
@@ -1238,6 +1239,32 @@ const handleReorderCategory = async ({ id, direction }) => {
   } else {
     return
   }
+
+  const items = siblings.map((c, i) => ({ id: c.id, position: i }))
+  await reorderItems('categories', items)
+}
+
+// 分类拖拽排序（同级之间）
+const handleCategoryDragReorder = async ({ draggedId, targetId, position }) => {
+  const dragged = categories.value.find(c => c.id === draggedId)
+  const target = categories.value.find(c => c.id === targetId)
+  if (!dragged || !target) return
+  // 双保险：仅允许同一父分类下的排序
+  if ((dragged.parent_id ?? null) !== (target.parent_id ?? null)) return
+
+  const parentId = dragged.parent_id ?? null
+  const siblings = categories.value
+    .filter(c => (c.parent_id ?? null) === parentId)
+    .sort((a, b) => a.position - b.position)
+
+  const fromIndex = siblings.findIndex(c => c.id === draggedId)
+  const targetIndex = siblings.findIndex(c => c.id === targetId)
+  if (fromIndex === -1 || targetIndex === -1) return
+
+  let insertIndex = position === 'after' ? targetIndex + 1 : targetIndex
+  const [removed] = siblings.splice(fromIndex, 1)
+  if (fromIndex < insertIndex) insertIndex -= 1
+  siblings.splice(insertIndex, 0, removed)
 
   const items = siblings.map((c, i) => ({ id: c.id, position: i }))
   await reorderItems('categories', items)

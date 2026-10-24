@@ -63,6 +63,7 @@
           @edit-category="handleEditCategory"
           @delete-category="handleDeleteCategory"
           @reorder-category="$emit('reorder-category', $event)"
+          @category-drag-reorder="$emit('category-drag-reorder', $event)"
         />
       </ul>
     </div>
@@ -124,7 +125,9 @@ const emit = defineEmits([
   'add-subcategory',
   'add-bookmark',
   'edit-category',
-  'delete-category'
+  'delete-category',
+  'reorder-category',
+  'category-drag-reorder'
 ])
 
 const treeData = computed(() => buildCategoryTree(props.categories))
