@@ -36,6 +36,7 @@
                 <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
               </div>
               <p class="progress-text">{{ progressPercentage }}%（{{ doneChunks }} / {{ totalChunks }} 批）</p>
+              <p v-if="lastError" class="chunk-error">最近一次批次失败：{{ lastError }}（会自动重试）</p>
               <p class="running-hint">每批约需 10~30 秒，请不要关闭页面</p>
             </div>
 
@@ -104,7 +105,7 @@ const { bookmarks, categories } = useBookmarks()
 const { refreshToken, isAuthenticated } = useAuth()
 const { success: toastSuccess, error: toastError } = useToast()
 
-const CHUNK_SIZE = 40
+const CHUNK_SIZE = 24
 
 const show = ref(false)
 const running = ref(false)
@@ -114,6 +115,7 @@ const errorMsg = ref('')
 
 const doneChunks = ref(0)
 const totalChunks = ref(0)
+const lastError = ref('')
 
 const bookmarkTotal = computed(() => bookmarks.value.length)
 const progressPercentage = computed(() => {
@@ -134,6 +136,7 @@ const open = () => {
   errorMsg.value = ''
   doneChunks.value = 0
   totalChunks.value = 0
+  lastError.value = ''
 }
 
 const close = () => {
@@ -191,9 +194,10 @@ const start = async () => {
         }
       }
 
-      // 其他错误：自动重试一次
+      // 其他错误：记录原因，自动重试一次
       if (!res.success) {
         lastChunkError = res.error
+        lastError.value = `第 ${Math.floor(i / CHUNK_SIZE) + 1} 批：${res.error}`
         await new Promise(resolve => setTimeout(resolve, 1500))
         res = await smartOrganizeChunk(chunk, existingPaths)
       }
@@ -401,6 +405,15 @@ defineExpose({ open, close })
   font-weight: 600;
   color: var(--primary);
   margin: 0;
+}
+
+.chunk-error {
+  font-size: 0.8125rem;
+  color: #d97706;
+  margin: 0;
+  text-align: center;
+  max-width: 100%;
+  word-break: break-all;
 }
 
 .fail-note {

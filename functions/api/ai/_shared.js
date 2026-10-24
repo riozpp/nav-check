@@ -71,10 +71,12 @@ export async function callOpenAI(env, { path, method = 'POST', body, headers = {
     body = JSON.stringify(body)
   }
 
+  // 90 秒超时：避免单次 AI 调用挂死到被 Cloudflare 边缘 524 掐断
   const response = await fetch(url, {
     method,
     headers: finalHeaders,
-    body: body instanceof ReadableStream ? body : body ?? undefined
+    body: body instanceof ReadableStream ? body : body ?? undefined,
+    signal: AbortSignal.timeout(90000)
   })
 
   if (!response.ok) {
